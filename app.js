@@ -597,7 +597,16 @@
       var code = r[0], res;
       try { res = makeQR(code); } catch (e) { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: e.message })); return; }
       var wrap = el('div'); wrap.innerHTML = qrSvg(res.q, p.name || 'Paciente');
-      holder.replaceChildren(wrap.firstChild, el('p', { class: 'hint', text: 'Muéstralo en la pantalla o imprímelo. El paciente lo escanea con Mi Plan Sarenti.' }));
+      /* Zoom: el QR a pantalla completa para que el paciente lo escanee del monitor o del celular. */
+      function zoom() {
+        var big = el('div', { class: 'zoom-qr' }); big.innerHTML = qrSvg(res.q, p.name || 'Paciente');
+        var dlg = el('dialog', { class: 'zoom', 'aria-label': 'Código QR en grande' }, [
+          el('button', { class: 'btn primary', type: 'button', onclick: function () { dlg.close(); }, text: '← Atrás' }), big]);
+        dlg.addEventListener('close', function () { dlg.remove(); });
+        document.body.appendChild(dlg); dlg.showModal();
+      }
+      holder.replaceChildren(wrap.firstChild, el('p', { class: 'hint', text: 'Muéstralo en la pantalla o imprímelo. El paciente lo escanea con Mi Plan Sarenti.' }),
+        el('button', { class: 'btn primary noprint', type: 'button', onclick: zoom, text: 'Zoom' }));
       /* Mensaje y código van separados para mandarlos en dos mensajes de WhatsApp. */
       function copy(box, done) {
         (navigator.clipboard ? navigator.clipboard.writeText(box.value) : Promise.reject()).then(function () { toast(done); }, function () { box.focus(); box.select(); toast('Selecciona y copia el texto'); });
