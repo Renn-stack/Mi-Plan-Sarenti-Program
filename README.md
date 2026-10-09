@@ -36,6 +36,6 @@ node tests/codec.test.js     # prueba del formato del código y capacidad del QR
 python3 -m http.server 8000  # probar en local
 ```
 
-Al cambiar archivos publicados, subir el número de `CACHE` en `sw.js` para que los dispositivos se actualicen.
+Con internet, la página siempre carga la versión más reciente; la copia guardada (service worker) solo se usa sin conexión. Si se agrega un archivo nuevo, sumarlo a `FILES` en `sw.js` y subir el número de `CACHE`.
 
 El formato del código está documentado en [FORMATO-DEL-CODIGO.md](FORMATO-DEL-CODIGO.md).
