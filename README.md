@@ -6,6 +6,7 @@ Herramienta web para crear planes de alimentación por paciente y generar el **c
 - Protegida con PIN. No usa servidores ni cuentas: **todos los planes se guardan solo en el navegador del dispositivo** (`localStorage`).
 - Se guarda sola mientras se escribe.
 - Respaldo: botón "Respaldo" para descargar y cargar un archivo con todos los planes (sirve para cambiar de dispositivo).
+- Escanear: en "Nuevo plan" se puede escanear el QR de un plan (cámara o foto) o pegar su código para seguir editándolo. Si el plan ya está en el dispositivo, pregunta si reemplazarlo.
 - Plantillas: "Guardar como plantilla" y "Nuevo plan" desde plantilla. Hay un "Plan de ejemplo" con datos inventados.
 
 ## Usar
@@ -27,7 +28,7 @@ Esta página **no contiene datos de pacientes** (están solo en cada dispositivo
 
 ## Desarrollo
 
-Sin dependencias de compilación. Librería de QR incluida en `vendor/` (qrcode-generator, MIT) y tipografías en `fonts/` (Cormorant Garamond y Jost, licencia OFL), para funcionar sin internet.
+Sin dependencias de compilación. Librerías de QR incluidas en `vendor/` (qrcode-generator, MIT, para crear; jsQR, Apache-2.0, para escanear) y tipografías en `fonts/` (Cormorant Garamond y Jost, licencia OFL), para funcionar sin internet.
 
 ```
 node tests/codec.test.js     # prueba del formato del código y capacidad del QR

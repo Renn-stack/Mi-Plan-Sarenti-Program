@@ -130,6 +130,7 @@
 
   /* ---------- armazón ---------- */
   function render() {
+    stopScan();
     if (!unlocked) { document.body.classList.remove('has-sel'); return renderLock(); }
     document.body.classList.toggle('has-sel', S.view !== 'none');
     var side = el('nav', { class: 'side', 'aria-label': 'Pacientes' });
@@ -206,18 +207,77 @@
         ]));
       });
     }
-    main.appendChild(el('div', { class: 'sub', text: 'O pegar un código' }));
-    main.appendChild(el('p', { class: 'hint', text: 'Para editar un plan que ya tiene código (por ejemplo, de otro dispositivo).' }));
-    var ta = el('textarea', { 'aria-label': 'Código del plan', placeholder: 'SARENTI1.…' });
     var msg = el('p', { class: 'err', role: 'alert' });
-    main.appendChild(ta);
-    main.appendChild(el('div', { class: 'row', style: 'margin-top:8px' }, [el('button', { class: 'btn', onclick: async function () {
+    /* Si el plan ya está en este dispositivo, se puede reemplazar con la versión del código. */
+    async function loadCode(text) {
       msg.textContent = '';
-      try { var p = await SarentiCodec.decode(ta.value); var ex = plans.filter(function (x) { return x.id === p.id; })[0]; if (ex) p.id = uid(); addPlan(p); }
-      catch (e) { msg.textContent = e.message; }
-    }, text: 'Cargar código' })]));
+      try {
+        var p = await SarentiCodec.decode(text), ex = plans.filter(function (x) { return x.id === p.id; })[0];
+        if (ex) {
+          if (confirm('Ya tienes el plan de ' + (ex.name || 'este paciente') + '. ¿Reemplazarlo con el del código?\n\nAceptar: reemplazar. Cancelar: guardarlo como copia.')) plans.splice(plans.indexOf(ex), 1);
+          else p.id = uid();
+        }
+        addPlan(p);
+      } catch (e) { msg.textContent = e.message; }
+    }
+    main.appendChild(el('div', { class: 'sub', text: 'O escanear un QR' }));
+    main.appendChild(el('p', { class: 'hint', text: 'Para editar un plan que ya tiene QR (por ejemplo, hecho en otro dispositivo).' }));
+    main.appendChild(scanner(loadCode));
+    main.appendChild(el('div', { class: 'sub', text: 'O pegar un código' }));
+    main.appendChild(el('p', { class: 'hint', text: 'El mensaje de WhatsApp completo o solo el código que empieza con SARENTI1.' }));
+    var ta = el('textarea', { 'aria-label': 'Código del plan', placeholder: 'SARENTI1.…' });
+    main.appendChild(ta);
+    main.appendChild(el('div', { class: 'row', style: 'margin-top:8px' }, [el('button', { class: 'btn', onclick: function () { loadCode(ta.value); }, text: 'Cargar código' })]));
     main.appendChild(msg);
     name.focus();
+  }
+
+  /* ---------- escanear QR ---------- */
+  var scanStop = null;
+  function stopScan() { if (scanStop) { scanStop(); scanStop = null; } }
+  function readQR(src, w, h, cv) {
+    cv.width = w; cv.height = h;
+    var g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(src, 0, 0, w, h);
+    var r = jsQR(g.getImageData(0, 0, w, h).data, w, h);
+    return r && r.data;
+  }
+  function fit(w, h, max) { var s = Math.min(1, max / Math.max(w, h)); return [Math.round(w * s), Math.round(h * s)]; }
+  function scanner(onCode) {
+    var box = el('div'), cv = document.createElement('canvas');
+    var msg = el('p', { class: 'hint', role: 'status' });
+    var video = el('video', { class: 'scan', playsinline: true, muted: true, 'aria-label': 'Vista de la cámara' });
+    var file = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: function (e) {
+      var f = e.target.files[0]; e.target.value = ''; if (!f) return;
+      var img = new Image();
+      img.onload = function () {
+        var d = fit(img.naturalWidth, img.naturalHeight, 1600), t = readQR(img, d[0], d[1], cv);
+        URL.revokeObjectURL(img.src);
+        if (t) { msg.textContent = ''; onCode(t); } else msg.textContent = 'No se encontró un QR en esa foto. Intenta con una más clara y de cerca.';
+      };
+      img.onerror = function () { msg.textContent = 'No se pudo abrir esa imagen.'; };
+      img.src = URL.createObjectURL(f);
+    } });
+    var cam = el('button', { class: 'btn primary', type: 'button', text: 'Abrir cámara', onclick: function () {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'Este navegador no puede usar la cámara. Sube una foto del QR.'; return; }
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(function (stream) {
+        stopScan();
+        var alive = true, timer = null;
+        scanStop = function () { alive = false; clearTimeout(timer); stream.getTracks().forEach(function (t) { t.stop(); }); video.remove(); cam.hidden = false; stop.hidden = true; };
+        video.srcObject = stream; box.prepend(video); video.play().catch(function () {});
+        cam.hidden = true; stop.hidden = false; msg.textContent = 'Apunta la cámara al QR.';
+        (function tick() {
+          if (!alive) return;
+          if (video.readyState >= 2 && video.videoWidth) {
+            var d = fit(video.videoWidth, video.videoHeight, 800), t = readQR(video, d[0], d[1], cv);
+            if (t) { stopScan(); msg.textContent = ''; onCode(t); return; }
+          }
+          timer = setTimeout(tick, 150);
+        })();
+      }, function () { msg.textContent = 'No se pudo abrir la cámara. Revisa el permiso del navegador o sube una foto del QR.'; });
+    } });
+    var stop = el('button', { class: 'btn', type: 'button', hidden: true, text: 'Cerrar cámara', onclick: function () { stopScan(); msg.textContent = ''; } });
+    box.append(el('div', { class: 'row' }, [cam, stop, el('button', { class: 'btn', type: 'button', text: 'Subir foto del QR', onclick: function () { file.click(); } }), file]), msg);
+    return box;
   }
 
   /* ---------- editor ---------- */

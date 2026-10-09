@@ -71,6 +71,7 @@ textarea{padding:12px 14px;min-height:96px;resize:vertical}
 .status{font-size:14px;color:var(--ok);font-weight:500;min-height:20px}
 .err{color:#9B2C2C;font-weight:500}
 /* QR */
+.scan{display:block;width:100%;max-width:420px;margin:0 auto 10px;border-radius:14px;background:#000}
 .qrbox{background:#fff;border:1px solid var(--p200);border-radius:18px;padding:18px;text-align:center}
 .qrbox svg{width:100%;max-width:360px;height:auto;display:block;margin:0 auto}
 .qrbox .who{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;margin-top:8px}
