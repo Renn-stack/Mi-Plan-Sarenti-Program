@@ -1,0 +1,15 @@
+{
+  "name": "Planes Sarenti",
+  "short_name": "Planes Sarenti",
+  "description": "Herramienta privada para crear planes de alimentación y sus códigos QR.",
+  "lang": "es",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FFF7FB",
+  "theme_color": "#8E2373",
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

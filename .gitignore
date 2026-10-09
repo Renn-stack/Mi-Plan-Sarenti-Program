@@ -1,0 +1,4 @@
+node_modules/
+*.pdf
+sarenti-respaldo-*.json
+.DS_Store
