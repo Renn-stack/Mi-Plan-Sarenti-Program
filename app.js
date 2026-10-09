@@ -547,23 +547,42 @@
       else dark = rnd() < 0.5 && inHeart(x + 0.5, y + 0.5, cx, cy, h + 0.7);
       if (dark) cells.push([x + ox, y + oy]);
     }
-    return { w: 2 * k * h + 2 * pad, h: (k + 1) * h + 2 * pad, outer: heartPath(cx + ox, cy + oy, h), cells: cells, box: [ox - gap, oy - gap, side] };
+    /* Etiqueta blanca para el nombre, en la punta del corazón debajo del QR (no tapa nada del código).
+       Su ancho máximo es el del corazón a la altura de su orilla de abajo. */
+    var fs = Math.max(6, n * 0.09), lh = fs * 1.55, ly = n + 1.5, maxW = 2 * (h - (ly + lh - cy)) - 3;
+    return { w: 2 * k * h + 2 * pad, h: (k + 1) * h + 2 * pad, outer: heartPath(cx + ox, cy + oy, h), cells: cells, box: [ox - gap, oy - gap, side],
+      label: { cx: cx + ox, y: ly + oy, h: lh, fs: fs, maxW: maxW } };
   }
-  function qrSvg(q) {
+  var NAME_FONT = '700 {fs}px "Cormorant Garamond", Georgia, serif';
+  function labelSize(lb, name) {   // ancho del texto medido con la tipografía real; se encoge si no cabe
+    var g = document.createElement('canvas').getContext('2d'); g.font = NAME_FONT.replace('{fs}', 100);
+    var tw = g.measureText(name).width / 100 * lb.fs, padX = lb.fs * 0.8, fit = Math.min(1, (lb.maxW - 2 * padX) / tw);
+    return { tw: tw * fit, fs: lb.fs * Math.max(fit, 0.55), squeeze: fit < 0.55, w: Math.min(lb.maxW, tw * fit + 2 * padX) };
+  }
+  function xmlEsc(t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function qrSvg(q, name) {
     var L = heartLayout(q), d = L.cells.map(function (p) { return 'M' + p[0] + ',' + p[1] + 'h1v1h-1z'; }).join('');
+    var lb = L.label, z = labelSize(lb, name);
+    var label = '<rect x="' + (lb.cx - z.w / 2).toFixed(2) + '" y="' + lb.y.toFixed(2) + '" width="' + z.w.toFixed(2) + '" height="' + lb.h.toFixed(2) + '" rx="' + (lb.h / 2).toFixed(2) + '" fill="#fff"/>' +
+      '<text x="' + lb.cx.toFixed(2) + '" y="' + (lb.y + lb.h / 2).toFixed(2) + '" dy="0.34em" text-anchor="middle" fill="' + WINE + '" font-family="\'Cormorant Garamond\', Georgia, serif" font-weight="700" font-size="' + z.fs.toFixed(2) + '"' +
+      (z.squeeze ? ' textLength="' + z.tw.toFixed(2) + '" lengthAdjust="spacingAndGlyphs"' : '') + '>' + xmlEsc(name) + '</text>';
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + L.w.toFixed(2) + ' ' + L.h.toFixed(2) + '" role="img" aria-label="Código QR del plan en forma de corazón">' +
       '<defs><clipPath id="hc"><path d="' + L.outer + '"/></clipPath></defs>' +
-      '<path d="' + d + '" fill="' + WINE + '" clip-path="url(#hc)" shape-rendering="crispEdges"/></svg>';
+      '<path d="' + d + '" fill="' + WINE + '" clip-path="url(#hc)" shape-rendering="crispEdges"/>' + label + '</svg>';
   }
   function qrPng(q, name) {
-    var L = heartLayout(q), px = Math.max(6, Math.floor(1200 / L.w)), cap = 100;
-    var cv = document.createElement('canvas'); cv.width = Math.ceil(L.w * px); cv.height = Math.ceil(L.h * px) + cap;
+    var L = heartLayout(q), px = Math.max(6, Math.floor(1200 / L.w)), lb = L.label, z = labelSize(lb, name);
+    var cv = document.createElement('canvas'); cv.width = Math.ceil(L.w * px); cv.height = Math.ceil(L.h * px);
     var g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
     g.save(); g.scale(px, px); g.clip(new Path2D(L.outer)); g.setTransform(1, 0, 0, 1, 0, 0);
     g.fillStyle = WINE;
     L.cells.forEach(function (p) { var x = Math.round(p[0] * px), y = Math.round(p[1] * px); g.fillRect(x, y, Math.round((p[0] + 1) * px) - x, Math.round((p[1] + 1) * px) - y); });
     g.restore();
-    g.fillStyle = '#3A1630'; g.font = '700 52px "Cormorant Garamond", serif'; g.textAlign = 'center'; g.fillText(name, cv.width / 2, cv.height - 36, cv.width - 40);
+    g.save(); g.scale(px, px);
+    g.fillStyle = '#fff'; g.beginPath(); g.roundRect(lb.cx - z.w / 2, lb.y, z.w, lb.h, lb.h / 2); g.fill();
+    g.fillStyle = WINE; g.font = NAME_FONT.replace('{fs}', z.fs); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(name, lb.cx, lb.y + lb.h / 2 + z.fs * 0.06, z.w - lb.fs);
+    g.restore();
     return cv;
   }
   function download(blob, fname) { var a = el('a', { href: URL.createObjectURL(blob), download: fname }); document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
@@ -573,11 +592,12 @@
     main.appendChild(el('div', { class: 'row noprint', style: 'margin:8px 0' }, [el('button', { class: 'btn small', onclick: function () { S.view = 'edit'; render(); focusMain(); }, text: '← Volver al plan' })]));
     var holder = el('div', { class: 'qrbox' }, [el('p', { class: 'muted', text: 'Generando…' })]);
     main.appendChild(holder);
-    SarentiCodec.encode(p).then(function (code) {
-      var res;
+    var fontReady = document.fonts ? document.fonts.load('700 20px "Cormorant Garamond"').catch(function () {}) : null;
+    Promise.all([SarentiCodec.encode(p), fontReady]).then(function (r) {
+      var code = r[0], res;
       try { res = makeQR(code); } catch (e) { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: e.message })); return; }
-      var wrap = el('div'); wrap.innerHTML = qrSvg(res.q);
-      holder.replaceChildren(wrap.firstChild, el('div', { class: 'who', text: p.name || 'Paciente' }), el('p', { class: 'hint', text: 'Muéstralo en la pantalla o imprímelo. El paciente lo escanea con Mi Plan Sarenti.' }));
+      var wrap = el('div'); wrap.innerHTML = qrSvg(res.q, p.name || 'Paciente');
+      holder.replaceChildren(wrap.firstChild, el('p', { class: 'hint', text: 'Muéstralo en la pantalla o imprímelo. El paciente lo escanea con Mi Plan Sarenti.' }));
       /* Mensaje y código van separados para mandarlos en dos mensajes de WhatsApp. */
       function copy(box, done) {
         (navigator.clipboard ? navigator.clipboard.writeText(box.value) : Promise.reject()).then(function () { toast(done); }, function () { box.focus(); box.select(); toast('Selecciona y copia el texto'); });
@@ -595,7 +615,7 @@
       main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [el('button', { class: 'btn primary', onclick: function () { copy(ta, 'Código copiado'); }, text: 'Copiar código' })]));
       main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [
         el('a', { class: 'btn', href: '#', onclick: function (e) { e.preventDefault(); window.open('https://wa.me/?text=' + encodeURIComponent(mbox.value + '\n\n' + code), '_blank', 'noopener'); }, text: 'Enviar todo junto por WhatsApp' }),
-        el('button', { class: 'btn', onclick: function () { qrPng(res.q, p.name || 'Plan').toBlob(function (b) { download(b, 'plan-' + slug(p.name) + '.png'); }); }, text: 'Descargar imagen' }),
+        el('button', { class: 'btn', onclick: function () { qrPng(res.q, p.name || 'Paciente').toBlob(function (b) { download(b, 'plan-' + slug(p.name) + '.png'); }); }, text: 'Descargar imagen' }),
         el('button', { class: 'btn', onclick: function () { window.print(); }, text: 'Imprimir' })
       ]));
       main.appendChild(el('p', { class: 'hint noprint', text: 'Tamaño del código: ' + code.length + ' caracteres (nivel de corrección ' + res.level + ').' }));
