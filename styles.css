@@ -27,6 +27,9 @@ textarea{padding:12px 14px;min-height:96px;resize:vertical}
 .muted{color:var(--muted)}
 .hint{font-size:14px;color:var(--muted)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.chips{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.chip{min-height:40px;padding:0 14px;border-radius:20px;border:1.5px dashed var(--ctl);background:#fff;color:var(--plum);font-size:15px;font-weight:500;cursor:pointer}
+.chip:hover{background:var(--p100)}
 .spacer{flex:1}
 /* cabecera */
 .top{display:flex;align-items:center;gap:12px;padding:14px 16px}
@@ -64,6 +67,9 @@ textarea{padding:12px 14px;min-height:96px;resize:vertical}
 .meal .head input[type=text]{font-weight:600}
 .meal .head input[type=time]{width:150px;flex:none}
 .item{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.item input.dish{font-weight:700;color:var(--plum);border-style:dashed}
+.dish-btn{min-height:40px;padding:0 10px;border-radius:20px;border:1.5px solid var(--ctl);background:#fff;color:var(--muted);font-size:13px;cursor:pointer;flex:none}
+.dish-btn[aria-pressed=true]{background:var(--plum);border-color:var(--plum);color:#fff}
 .sub{font-family:'Cormorant Garamond',serif;font-size:24px;color:var(--plum);margin:18px 0 8px}
 .tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
 .tabs button{min-height:44px;padding:0 16px;border-radius:22px;border:1.5px solid var(--ctl);background:#fff;font-weight:500;cursor:pointer}
@@ -73,7 +79,7 @@ textarea{padding:12px 14px;min-height:96px;resize:vertical}
 /* QR */
 .scan{display:block;width:100%;max-width:420px;margin:0 auto 10px;border-radius:14px;background:#000}
 .qrbox{background:#fff;border:1px solid var(--p200);border-radius:18px;padding:18px;text-align:center}
-.qrbox svg{width:100%;max-width:360px;height:auto;display:block;margin:0 auto}
+.qrbox svg{width:100%;max-width:620px;height:auto;display:block;margin:0 auto}
 .qrbox .who{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;margin-top:8px}
 /* PIN */
 .lock{max-width:380px;margin:0 auto;padding:40px 24px;text-align:center}

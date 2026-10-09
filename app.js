@@ -44,9 +44,6 @@
   }
   function samplePlan() {
     var p = blankPlan('Lucía Torres');
-    p.daily = ['Probiótico en ayunas', 'Colágeno en la mañana', '2 litros de agua'];
-    p.avoid = ['Refrescos y jugos industrializados', 'Pan dulce', 'Frituras'];
-    p.prep = ['Hornear o asar, evitar freír', 'Pesar los alimentos en crudo'];
     var desayunos = [['2 huevos', '1/3 de aguacate', '1 tortilla de maíz'], ['Licuado de proteína', '1 manzana'], ['Avena con canela', '1 puñito de nueces'], ['Omelette de espinacas', '1 tostada'], ['Yogurt natural', 'Fruta picada', 'Chía'], ['Huevo con chayote', '1 tortilla'], ['Quesadillas de queso panela', 'Salsa']];
     var comidas = [['Pechuga de pollo', 'Ensalada', 'Arroz integral'], ['Bistec', 'Verduras al vapor'], ['Pescado al horno', 'Ensalada'], ['Caldo de pollo', 'Verduras'], ['Pechuga de pollo', 'Ensalada'], ['Sándwich integral', 'Jícama'], ['Caldo de pollo', 'Fruta']];
     for (var d = 0; d < 7; d++) {
@@ -283,23 +280,53 @@
   }
 
   /* ---------- editor ---------- */
-  function listEditor(arr, label, placeholder, onChange) {
+  /* Un renglón que empieza con "# " es el nombre del platillo: la app lo muestra como título, sin casilla. */
+  function isDish(t) { return t.slice(0, 2) === '# '; }
+  function dishText(t) { return isDish(t) ? t.slice(2) : t; }
+  function listEditor(arr, label, placeholder, onChange, dishes) {
     var box = el('div');
     function draw(focusIdx) {
       box.replaceChildren();
       arr.forEach(function (txt, i) {
-        var inp = el('input', { type: 'text', value: txt, 'aria-label': label + ' ' + (i + 1), placeholder: placeholder, oninput: function (e) { arr[i] = e.target.value; onChange(); },
+        var dish = dishes && isDish(txt);
+        var inp = el('input', { type: 'text', class: dish ? 'dish' : null, value: dishes ? dishText(txt) : txt, 'aria-label': (dish ? 'Platillo ' : label + ' ') + (i + 1), placeholder: dish ? 'Ej. Chilaquiles' : placeholder,
+          oninput: function (e) { arr[i] = (dishes && isDish(arr[i]) ? '# ' : '') + e.target.value; onChange(); },
           onkeydown: function (e) { if (e.key === 'Enter') { e.preventDefault(); arr.splice(i + 1, 0, ''); onChange(); draw(i + 1); } } });
-        box.appendChild(el('div', { class: 'item' }, [inp, el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Quitar: ' + (txt || label + ' ' + (i + 1)), onclick: function () { arr.splice(i, 1); onChange(); draw(Math.max(0, i - 1)); }, text: '✕' })]));
+        var mark = dishes ? el('button', { class: 'dish-btn', type: 'button', 'aria-pressed': dish, title: 'Nombre del platillo (sin casilla en la app)', text: 'Platillo',
+          onclick: function () { arr[i] = isDish(arr[i]) ? dishText(arr[i]) : '# ' + arr[i]; onChange(); draw(i); } }) : null;
+        box.appendChild(el('div', { class: 'item' }, [inp, mark, el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Quitar: ' + (dishText(txt) || label + ' ' + (i + 1)), onclick: function () { arr.splice(i, 1); onChange(); draw(Math.max(0, i - 1)); }, text: '✕' })]));
         if (i === focusIdx) setTimeout(function () { inp.focus(); }, 0);
       });
       box.appendChild(el('button', { class: 'btn small', type: 'button', style: 'margin-top:4px', onclick: function () { arr.push(''); onChange(); draw(arr.length - 1); }, text: '+ Agregar' }));
     }
-    draw(-1); return box;
+    draw(-1); box.draw = draw; return box;
+  }
+  /* Botones para agregar indicaciones comunes con un toque. Se ocultan las que ya están en la lista. */
+  var SUGGEST = {
+    daily: ['Probiótico en ayunas', 'Colágeno en la mañana', '2 litros de agua', 'Caminar 30 minutos', 'Dormir de 7 a 8 horas', 'Multivitamínico con el desayuno'],
+    avoid: ['Refrescos y jugos industrializados', 'Pan dulce', 'Frituras', 'Alcohol', 'Comida rápida', 'Azúcar añadida', 'Embutidos'],
+    prep: ['Hornear o asar, evitar freír', 'Pesar los alimentos en crudo', 'Cocinar con poco aceite', 'Usar aceite de oliva o de aguacate', 'Verduras al vapor', 'No agregar sal en la mesa']
+  };
+  function suggestions(arr, list, editor, onChange) {
+    var row = el('div', { class: 'chips noprint' });
+    function draw() {
+      var have = arr.map(function (t) { return t.trim().toLowerCase(); });
+      var left = list.filter(function (t) { return have.indexOf(t.toLowerCase()) < 0; });
+      row.replaceChildren();
+      if (!left.length) return;
+      row.appendChild(el('span', { class: 'hint', text: 'Agregar rápido:' }));
+      left.forEach(function (t) {
+        row.appendChild(el('button', { class: 'chip', type: 'button', 'aria-label': 'Agregar: ' + t, onclick: function () {
+          var i = arr.indexOf(''); if (i >= 0) arr[i] = t; else arr.push(t);
+          onChange(); editor.draw(-1); draw();
+        }, text: '+ ' + t }));
+      });
+    }
+    draw(); row.draw = draw; return row;
   }
   function cleanPlan(p) {
     p.daily = p.daily.filter(function (s) { return s.trim(); }); p.avoid = p.avoid.filter(function (s) { return s.trim(); }); p.prep = p.prep.filter(function (s) { return s.trim(); });
-    p.days.forEach(function (d) { d.forEach(function (m) { m.items = m.items.map(function (s) { return s.trim(); }).filter(Boolean); m.name = m.name.trim() || 'Comida'; }); });
+    p.days.forEach(function (d) { d.forEach(function (m) { m.items = m.items.map(function (s) { s = s.trim(); return s === '#' ? '' : s; }).filter(Boolean); m.name = m.name.trim() || 'Comida'; }); });
   }
 
   function buildEditor(main, p) {
@@ -333,7 +360,9 @@
      ['prep', 'Preparación', 'Ej. Hornear en vez de freír', 'Cómo preparar los alimentos.']].forEach(function (s) {
       main.appendChild(el('div', { class: 'sub', text: s[1] }));
       main.appendChild(el('p', { class: 'hint', text: s[3] }));
-      main.appendChild(listEditor(p[s[0]], s[1], s[2], touch));
+      var chips, editor = listEditor(p[s[0]], s[1], s[2], function () { touch(); if (chips) chips.draw(); });
+      chips = suggestions(p[s[0]], SUGGEST[s[0]], editor, touch);
+      main.appendChild(editor); main.appendChild(chips);
     });
   }
 
@@ -344,7 +373,7 @@
     main.appendChild(el('h2', { text: DAYS[S.day], style: 'margin-bottom:10px' }));
     var meals = p.days[S.day];
     meals.forEach(function (m, mi) {
-      var items = listEditor(m.items, 'Alimento', 'Ej. 2 huevos', touch);
+      var items = listEditor(m.items, 'Alimento', 'Ej. 2 huevos', touch, true);
       main.appendChild(el('section', { class: 'card meal', 'aria-label': m.name }, [
         el('div', { class: 'head' }, [
           el('input', { type: 'text', value: m.name, 'aria-label': 'Nombre de la comida', oninput: function (e) { m.name = e.target.value; touch(); } }),
@@ -388,7 +417,7 @@
       '- Responde ÚNICAMENTE con un objeto JSON válido. Sin texto antes ni después, sin explicaciones y sin ``` .\n' +
       '- Usa EXACTAMENTE las mismas llaves (en MAYÚSCULAS) que el esqueleto de abajo.\n' +
       '- El valor de cada celda es un texto; escribe cada alimento o cantidad en su propia línea separada con \\n.\n' +
-      '- Si el platillo tiene nombre (ej. "Pasta boloñesa", "Ensalada César"), ponlo en la PRIMERA línea de la celda y debajo los ingredientes o cantidades. Si no tiene nombre, deja solo los ingredientes.\n' +
+      '- Si el platillo tiene nombre (ej. "Pasta boloñesa", "Ensalada César"), ponlo en la PRIMERA línea de la celda empezando con # (ej. "# Pasta boloñesa") y debajo los ingredientes o cantidades. Si no tiene nombre, deja solo los ingredientes.\n' +
       '- Si una comida no aplica para algún día, deja la celda como cadena vacía "".\n\n' +
       'Esqueleto a llenar (rellena los valores manteniendo las llaves):\n' + skel;
   }
@@ -414,7 +443,11 @@
         if (di < 0) return;
         if (Array.isArray(v)) v = v.join('\n');
         if (typeof v !== 'string') return;
-        days[di][mi] = v.split(/\r?\n/).map(function (t) { return t.replace(/^\s*[-•*]\s*/, '').trim().slice(0, 200); }).filter(Boolean).slice(0, 40);
+        var lines = v.split(/\r?\n/).map(function (t) { return t.replace(/^\s*[-•*]\s*/, '').trim(); }).filter(function (t) { return t && t !== '#'; });
+        // El nombre del platillo viene con "#". Si la IA no lo puso, la primera línea es nombre cuando no empieza con cantidad y las demás sí.
+        var marked = lines.some(function (t) { return t[0] === '#'; }), qty = /^[\d½¼¾]/;
+        if (!marked && lines.length > 1 && !qty.test(lines[0]) && lines.slice(1).some(function (t) { return qty.test(t); })) lines[0] = '# ' + lines[0];
+        days[di][mi] = lines.map(function (t) { return (t[0] === '#' ? '# ' + t.replace(/^#+\s*/, '') : t).slice(0, 200); }).slice(0, 40);
         found++;
       });
     });
@@ -478,18 +511,59 @@
     }
     throw new Error('El plan es demasiado largo para un QR. Acorta algunos textos.');
   }
+  /* QR en forma de corazón, como un mosaico de cuadritos color vino del logo.
+     El QR real va en el centro y el resto del corazón
+     se llena con cuadritos de relleno que no son parte del código. El corazón es un rombo (centro C, media
+     diagonal h) más dos semicírculos en sus lados de arriba; el cuadro del QR (lado 0.62·2h, subido 0.32·h)
+     queda dentro con margen. El relleno sale de una semilla del propio QR: el mismo plan da la misma imagen. */
+  var WINE = '#8E2373';
+  function heartPath(cx, cy, h) {
+    var r = h / Math.SQRT2;
+    return 'M' + cx + ',' + (cy + h) + 'L' + (cx - h) + ',' + cy + 'A' + r + ',' + r + ' 0 1 1 ' + cx + ',' + (cy - h) +
+      'A' + r + ',' + r + ' 0 1 1 ' + (cx + h) + ',' + cy + 'Z';
+  }
+  function inHeart(x, y, cx, cy, h) {
+    var r = h / Math.SQRT2, dl = Math.hypot(x - cx + h / 2, y - cy + h / 2), dr = Math.hypot(x - cx - h / 2, y - cy + h / 2);
+    return Math.abs(x - cx) + Math.abs(y - cy) <= h || dl <= r || dr <= r;
+  }
+  function heartLayout(q) {
+    var n = q.getModuleCount(), gap = 1, side = n + 2 * gap, pad = 1, k = 1.2072;
+    var h = side / 0.62 / 2, qc = n / 2, cx = qc, cy = qc + 0.32 * h;   // coordenadas en cuadritos, QR en [0, n)
+    var ox = pad - (cx - k * h), oy = pad - (cy - k * h);                  // desplazamiento al lienzo
+    var seed = n;
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) seed = (Math.imul(seed, 31) + (q.isDark(r, c) ? 1 : 0)) | 0;
+    function rnd() { seed = (seed + 0x6D2B79F5) | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t ^= t + Math.imul(t ^ t >>> 7, 61 | t); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+    /* Solo junto a los 3 cuadros de las esquinas queda un margen claro (para que el celular los encuentre);
+       en el resto de la orilla el relleno toca el QR y no se nota dónde empieza. */
+    function nearFinder(x, y) {
+      function near(a, lo) { return a >= lo - gap && a < lo + 7 + gap; }
+      return (near(x, 0) && near(y, 0)) || (near(x, n - 7) && near(y, 0)) || (near(x, 0) && near(y, n - 7));
+    }
+    var cells = [];
+    for (var y = Math.floor(cy - k * h); y < Math.ceil(cy + h); y++) for (var x = Math.floor(cx - k * h); x < Math.ceil(cx + k * h); x++) {
+      var dark;
+      if (x >= 0 && x < n && y >= 0 && y < n) dark = q.isDark(y, x);
+      else if (nearFinder(x, y)) dark = false;
+      else dark = rnd() < 0.5 && inHeart(x + 0.5, y + 0.5, cx, cy, h + 0.7);
+      if (dark) cells.push([x + ox, y + oy]);
+    }
+    return { w: 2 * k * h + 2 * pad, h: (k + 1) * h + 2 * pad, outer: heartPath(cx + ox, cy + oy, h), cells: cells, box: [ox - gap, oy - gap, side] };
+  }
   function qrSvg(q) {
-    var n = q.getModuleCount(), m = 4, d = '';
-    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) d += 'M' + (c + m) + ',' + (r + m) + 'h1v1h-1z';
-    var s = n + 2 * m;
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + s + ' ' + s + '" role="img" aria-label="Código QR del plan" shape-rendering="crispEdges"><rect width="' + s + '" height="' + s + '" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
+    var L = heartLayout(q), d = L.cells.map(function (p) { return 'M' + p[0] + ',' + p[1] + 'h1v1h-1z'; }).join('');
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + L.w.toFixed(2) + ' ' + L.h.toFixed(2) + '" role="img" aria-label="Código QR del plan en forma de corazón">' +
+      '<defs><clipPath id="hc"><path d="' + L.outer + '"/></clipPath></defs>' +
+      '<path d="' + d + '" fill="' + WINE + '" clip-path="url(#hc)" shape-rendering="crispEdges"/></svg>';
   }
   function qrPng(q, name) {
-    var n = q.getModuleCount(), m = 4, px = Math.max(4, Math.floor(900 / (n + 2 * m))), size = px * (n + 2 * m), cap = 90;
-    var cv = document.createElement('canvas'); cv.width = size; cv.height = size + cap;
-    var g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = '#000';
-    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) g.fillRect((c + m) * px, (r + m) * px, px, px);
-    g.fillStyle = '#3A1630'; g.font = '700 44px "Cormorant Garamond", serif'; g.textAlign = 'center'; g.fillText(name, size / 2, size + 56, size - 40);
+    var L = heartLayout(q), px = Math.max(6, Math.floor(1200 / L.w)), cap = 100;
+    var cv = document.createElement('canvas'); cv.width = Math.ceil(L.w * px); cv.height = Math.ceil(L.h * px) + cap;
+    var g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+    g.save(); g.scale(px, px); g.clip(new Path2D(L.outer)); g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = WINE;
+    L.cells.forEach(function (p) { var x = Math.round(p[0] * px), y = Math.round(p[1] * px); g.fillRect(x, y, Math.round((p[0] + 1) * px) - x, Math.round((p[1] + 1) * px) - y); });
+    g.restore();
+    g.fillStyle = '#3A1630'; g.font = '700 52px "Cormorant Garamond", serif'; g.textAlign = 'center'; g.fillText(name, cv.width / 2, cv.height - 36, cv.width - 40);
     return cv;
   }
   function download(blob, fname) { var a = el('a', { href: URL.createObjectURL(blob), download: fname }); document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
@@ -504,14 +578,23 @@
       try { res = makeQR(code); } catch (e) { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: e.message })); return; }
       var wrap = el('div'); wrap.innerHTML = qrSvg(res.q);
       holder.replaceChildren(wrap.firstChild, el('div', { class: 'who', text: p.name || 'Paciente' }), el('p', { class: 'hint', text: 'Muéstralo en la pantalla o imprímelo. El paciente lo escanea con Mi Plan Sarenti.' }));
-      var ta = el('textarea', { readonly: true, 'aria-label': 'Código de texto para WhatsApp', onfocus: function (e) { e.target.select(); } }); ta.value = code;
-      var msg = 'Hola, este es tu plan de Mi Plan Sarenti. Copia este mensaje completo y en la app elige “Pegar código de WhatsApp”.\n\n' + code;
-      main.appendChild(el('div', { class: 'sub noprint', text: 'Código de texto' }));
-      main.appendChild(el('p', { class: 'hint noprint', text: 'Para pacientes que lo reciben por WhatsApp en lugar de escanear.' }));
+      /* Mensaje y código van separados para mandarlos en dos mensajes de WhatsApp. */
+      function copy(box, done) {
+        (navigator.clipboard ? navigator.clipboard.writeText(box.value) : Promise.reject()).then(function () { toast(done); }, function () { box.focus(); box.select(); toast('Selecciona y copia el texto'); });
+      }
+      var mbox = el('textarea', { 'aria-label': 'Mensaje para WhatsApp', style: 'min-height:80px' });
+      mbox.value = 'Hola, te comparto tu plan de alimentación de Mi Plan Sarenti. En el siguiente mensaje va tu código: cópialo completo y en la app elige “Código manual”.';
+      var ta = el('textarea', { readonly: true, 'aria-label': 'Código del plan', onfocus: function (e) { e.target.select(); } }); ta.value = code;
+      main.appendChild(el('div', { class: 'sub noprint', text: 'Mensaje' }));
+      main.appendChild(el('p', { class: 'hint noprint', text: 'Para pacientes que lo reciben por WhatsApp en lugar de escanear. Mándalo primero; puedes cambiar el texto.' }));
+      main.appendChild(mbox);
+      main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [el('button', { class: 'btn primary', onclick: function () { copy(mbox, 'Mensaje copiado'); }, text: 'Copiar mensaje' })]));
+      main.appendChild(el('div', { class: 'sub noprint', text: 'Código manual' }));
+      main.appendChild(el('p', { class: 'hint noprint', text: 'Mándalo en un mensaje aparte, sin cambiarlo.' }));
       main.appendChild(ta);
+      main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [el('button', { class: 'btn primary', onclick: function () { copy(ta, 'Código copiado'); }, text: 'Copiar código' })]));
       main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [
-        el('button', { class: 'btn primary', onclick: function () { (navigator.clipboard ? navigator.clipboard.writeText(msg) : Promise.reject()).then(function () { toast('Mensaje copiado'); }, function () { ta.select(); toast('Selecciona y copia el código'); }); }, text: 'Copiar mensaje' }),
-        el('a', { class: 'btn', href: 'https://wa.me/?text=' + encodeURIComponent(msg), target: '_blank', rel: 'noopener', text: 'Enviar por WhatsApp' }),
+        el('a', { class: 'btn', href: '#', onclick: function (e) { e.preventDefault(); window.open('https://wa.me/?text=' + encodeURIComponent(mbox.value + '\n\n' + code), '_blank', 'noopener'); }, text: 'Enviar todo junto por WhatsApp' }),
         el('button', { class: 'btn', onclick: function () { qrPng(res.q, p.name || 'Plan').toBlob(function (b) { download(b, 'plan-' + slug(p.name) + '.png'); }); }, text: 'Descargar imagen' }),
         el('button', { class: 'btn', onclick: function () { window.print(); }, text: 'Imprimir' })
       ]));
