@@ -7,6 +7,7 @@ Herramienta web para crear planes de alimentación por paciente y generar el **c
 - Se guarda sola mientras se escribe.
 - Respaldo: botón "Respaldo" para descargar y cargar un archivo con todos los planes (sirve para cambiar de dispositivo).
 - Escanear: en "Nuevo plan" se puede escanear el QR de un plan (cámara o foto) o pegar su código para seguir editándolo. Si el plan ya está en el dispositivo, pregunta si reemplazarlo.
+- Llenar con IA: la pestaña "Llenar con IA" del plan arma las instrucciones con edad, peso, condición, alergias y objetivo (sin el nombre del paciente) para pegarlas en ChatGPT u otra IA. Al pegar su respuesta (JSON) se llenan los 7 días, que luego se pueden ajustar. Esos datos se guardan solo en el dispositivo y no van en el QR.
 - Plantillas: "Guardar como plantilla" y "Nuevo plan" desde plantilla. Hay un "Plan de ejemplo" con datos inventados.
 
 ## Usar

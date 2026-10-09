@@ -7,7 +7,7 @@
 :root{--plum:#8E2373;--ink:#3A1630;--muted:#6E4A62;--p50:#FFF7FB;--p100:#F8E4F0;--p200:#F0D3E5;--ctl:#A86E98;--ok:#2E6B3F}
 *{box-sizing:border-box}
 html,body{margin:0}
-body{font-family:'Jost',system-ui,sans-serif;color:var(--ink);background:var(--p50);font-size:16px;line-height:1.35}
+body{font-family:'Jost',system-ui,sans-serif;color:var(--ink);background:linear-gradient(180deg,#F8E1EF,var(--p50) 104px) no-repeat var(--p50);font-size:16px;line-height:1.35}
 h1,h2,h3{font-family:'Cormorant Garamond',serif;margin:0;font-weight:700;line-height:1.05}
 button,input,textarea,select{font:inherit;color:inherit}
 :focus-visible{outline:3px solid var(--plum);outline-offset:2px}
@@ -29,7 +29,7 @@ textarea{padding:12px 14px;min-height:96px;resize:vertical}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .spacer{flex:1}
 /* cabecera */
-.top{display:flex;align-items:center;gap:12px;padding:14px 16px;background:linear-gradient(180deg,#F8E1EF,var(--p50))}
+.top{display:flex;align-items:center;gap:12px;padding:14px 16px}
 .top img{height:48px;width:auto;mix-blend-mode:multiply}
 .top .brand{font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--plum);font-weight:600}
 .top h1{font-size:28px}

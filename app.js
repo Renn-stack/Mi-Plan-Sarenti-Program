@@ -17,7 +17,9 @@
     var n = document.createElement(tag);
     if (attrs) for (var k in attrs) {
       var v = attrs[k];
-      if (v === null || v === undefined || v === false) continue;
+      if (v === null || v === undefined) continue;
+      if (k.slice(0, 5) === 'aria-') { n.setAttribute(k, String(v)); continue; }
+      if (v === false) continue;
       if (k === 'class') n.className = v;
       else if (k === 'text') n.textContent = v;
       else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), v);
@@ -307,15 +309,16 @@
     ]));
     main.appendChild(el('div', { class: 'tabs', role: 'group', 'aria-label': 'Sección' }, [
       el('button', { 'aria-pressed': S.tab === 'dias', onclick: function () { S.tab = 'dias'; render(); }, text: 'Comidas por día' }),
-      el('button', { 'aria-pressed': S.tab === 'general', onclick: function () { S.tab = 'general'; render(); }, text: 'Indicaciones generales' })
+      el('button', { 'aria-pressed': S.tab === 'general', onclick: function () { S.tab = 'general'; render(); }, text: 'Indicaciones generales' }),
+      el('button', { 'aria-pressed': S.tab === 'ia', onclick: function () { S.tab = 'ia'; render(); }, text: 'Llenar con IA' })
     ]));
-    if (S.tab === 'dias') editDays(main, p); else editGeneral(main, p);
+    if (S.tab === 'dias') editDays(main, p); else if (S.tab === 'ia') buildAI(main, p); else editGeneral(main, p);
 
     main.appendChild(el('div', { class: 'status noprint', id: 'status', role: 'status', 'aria-live': 'polite', text: saved ? 'Guardado' : '', style: 'margin-top:8px' }));
     main.appendChild(el('div', { class: 'row noprint', style: 'margin:12px 0 24px' }, [
       el('button', { class: 'btn primary', onclick: function () { cleanPlan(p); touch(); persist(); S.view = 'qr'; render(); focusMain(); }, text: 'Generar QR' }),
       el('button', { class: 'btn', onclick: function () { var c = clone(p); c.id = uid(); c.name = p.name + ' (copia)'; c.updated = nowSec(); plans.push(c); S.sel = c.id; persist(); render(); toast('Plan duplicado'); }, text: 'Duplicar' }),
-      el('button', { class: 'btn', onclick: function () { var n = prompt('Nombre de la plantilla (sin datos del paciente):', ''); if (!n) return; var c = clone(p); c.tplName = n.trim(); c.name = ''; templates.push(c); persist(); toast('Plantilla guardada'); }, text: 'Guardar como plantilla' }),
+      el('button', { class: 'btn', onclick: function () { var n = prompt('Nombre de la plantilla (sin datos del paciente):', ''); if (!n) return; var c = clone(p); c.tplName = n.trim(); c.name = ''; delete c.ai; templates.push(c); persist(); toast('Plantilla guardada'); }, text: 'Guardar como plantilla' }),
       el('button', { class: 'btn danger', onclick: function () { if (confirm('¿Eliminar el plan de ' + (p.name || 'este paciente') + '? No se puede deshacer.')) { plans = plans.filter(function (x) { return x !== p; }); persist(); S.sel = null; S.view = 'none'; render(); } }, text: 'Eliminar' })
     ]));
   }
@@ -362,6 +365,109 @@
       }, text: 'Copiar' })
     ]);
     main.appendChild(det);
+  }
+
+  /* ---------- llenar con IA ---------- */
+  /* La doctora copia las instrucciones a una IA (ChatGPT, Gemini…) y pega la respuesta JSON.
+     Los datos del paciente se guardan en p.ai solo en este dispositivo: no van en el QR. */
+  var AI_MEALS = [['DESAYUNO', 'Desayuno', '08:00'], ['COLACIÓN MAÑANERA', 'Colación', '11:00'], ['COMIDA', 'Comida', '14:00'], ['COLACIÓN VESPERTINA', 'Colación', '17:00'], ['CENA', 'Cena', '20:00']];
+  var AI_DAYS = ['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO', 'DOMINGO'];
+  var AI_FIELDS = [['edad', 'Edad', 'Ej. 34 años'], ['peso', 'Peso', 'Ej. 72 kg'], ['cond', 'Condición', 'Ej. resistencia a la insulina'],
+    ['nogusta', 'No le gusta (alimento o ingrediente)', 'Ej. hígado, brócoli'], ['alergia', 'Es alérgico', 'Ej. nuez, o "ninguna"'], ['objetivo', 'El objetivo es', 'Ej. bajar 5 kg de grasa']];
+  function norm(t) { return String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim(); }
+  function aiPrompt(d) {
+    var skel = '{\n' + AI_MEALS.map(function (m, i) {
+      return '  "' + m[0] + '": {\n' + AI_DAYS.map(function (n, j) { return '    "' + n + '": ""' + (j < 6 ? ',' : ''); }).join('\n') + '\n  }' + (i < 4 ? ',' : '');
+    }).join('\n') + '\n}';
+    return 'Actúa como nutriólogo/a. Genera un plan de alimentación saludable y variado de 7 días:\n\n' +
+      'La o el paciente tiene:\n\nEDAD: ' + d.edad + '\n\nPESO: ' + d.peso + '\n\nCondición: ' + d.cond +
+      '\n\nNo le gusta (alimento o ingrediente): ' + d.nogusta + '\n\nEs alérgico: ' + d.alergia + '\n\n\nEl objetivo es: ' + d.objetivo + '\n\n\n' +
+      'Comidas (en este orden): DESAYUNO, COLACIÓN MAÑANERA, COMIDA, COLACIÓN VESPERTINA, CENA.\n' +
+      'Días: LUNES, MARTES, MIÉRCOLES, JUEVES, VIERNES, SÁBADO, DOMINGO.\n\n' +
+      'REGLAS DE FORMATO (muy importantes):\n' +
+      '- Responde ÚNICAMENTE con un objeto JSON válido. Sin texto antes ni después, sin explicaciones y sin ``` .\n' +
+      '- Usa EXACTAMENTE las mismas llaves (en MAYÚSCULAS) que el esqueleto de abajo.\n' +
+      '- El valor de cada celda es un texto; escribe cada alimento o cantidad en su propia línea separada con \\n.\n' +
+      '- Si el platillo tiene nombre (ej. "Pasta boloñesa", "Ensalada César"), ponlo en la PRIMERA línea de la celda y debajo los ingredientes o cantidades. Si no tiene nombre, deja solo los ingredientes.\n' +
+      '- Si una comida no aplica para algún día, deja la celda como cadena vacía "".\n\n' +
+      'Esqueleto a llenar (rellena los valores manteniendo las llaves):\n' + skel;
+  }
+  function aiMeal(key) {
+    var k = norm(key);
+    if (k.indexOf('COLACION') >= 0) return /VESPER|TARDE/.test(k) ? 3 : 1;
+    if (k.indexOf('DESAYUNO') >= 0) return 0;
+    if (k.indexOf('CENA') >= 0) return 4;
+    if (k.indexOf('COMIDA') >= 0) return 2;
+    return -1;
+  }
+  /* Devuelve 7 días × 5 comidas con la lista de alimentos de cada una. Tolera texto alrededor y acentos distintos. */
+  function parseAI(text) {
+    var a = text.indexOf('{'), b = text.lastIndexOf('}'), o, found = 0;
+    if (a < 0 || b < a) throw new Error('No encontré el plan en lo que pegaste. Copia la respuesta completa de la IA.');
+    try { o = JSON.parse(text.slice(a, b + 1)); } catch (e) { throw new Error('La respuesta está incompleta o tiene un error. Pide a la IA que la vuelva a escribir solo como JSON.'); }
+    var days = AI_DAYS.map(function () { return [[], [], [], [], []]; }), dayKeys = AI_DAYS.map(norm);
+    Object.keys(o || {}).forEach(function (mk) {
+      var mi = aiMeal(mk), row = o[mk];
+      if (mi < 0 || !row || typeof row !== 'object') return;
+      Object.keys(row).forEach(function (dk) {
+        var di = dayKeys.indexOf(norm(dk)), v = row[dk];
+        if (di < 0) return;
+        if (Array.isArray(v)) v = v.join('\n');
+        if (typeof v !== 'string') return;
+        days[di][mi] = v.split(/\r?\n/).map(function (t) { return t.replace(/^\s*[-•*]\s*/, '').trim().slice(0, 200); }).filter(Boolean).slice(0, 40);
+        found++;
+      });
+    });
+    if (!found) throw new Error('No encontré las comidas y los días esperados. Revisa que pegaste la respuesta de estas instrucciones.');
+    return days;
+  }
+  function applyAI(p, days) {
+    p.days = days.map(function (day, di) {
+      var old = p.days[di] || [];
+      return AI_MEALS.map(function (m, mi) {
+        var prev = old[mi] && norm(old[mi].name) === norm(m[1]) ? old[mi].time : null;
+        return { name: m[1], time: prev || m[2], items: day[mi] };
+      }).filter(function (m) { return m.items.length; });
+    });
+  }
+  function buildAI(main, p) {
+    var d = p.ai || (p.ai = {});
+    AI_FIELDS.forEach(function (f) { if (typeof d[f[0]] !== 'string') d[f[0]] = ''; });
+    main.appendChild(el('p', { class: 'hint', text: 'Genera los 7 días con ChatGPT u otra IA. Las instrucciones no incluyen el nombre del paciente.' }));
+
+    main.appendChild(el('div', { class: 'sub', text: '1. Datos del paciente' }));
+    AI_FIELDS.forEach(function (f) {
+      main.appendChild(el('div', { class: 'field' }, [
+        el('label', { for: 'ai-' + f[0], text: f[1] }),
+        el('input', { type: 'text', id: 'ai-' + f[0], value: d[f[0]], placeholder: f[2], autocomplete: 'off', oninput: function (e) { d[f[0]] = e.target.value; touch(); } })
+      ]));
+    });
+
+    main.appendChild(el('div', { class: 'sub', text: '2. Copiar las instrucciones' }));
+    main.appendChild(el('p', { class: 'hint', text: 'Pégalas en ChatGPT, Gemini, Claude u otra IA y espera la respuesta.' }));
+    var shown = el('textarea', { readonly: true, 'aria-label': 'Instrucciones para la IA', style: 'min-height:220px', onfocus: function (e) { e.target.select(); } });
+    var det = el('details', { class: 'card', ontoggle: function () { shown.value = aiPrompt(d); } }, [el('summary', { text: 'Ver las instrucciones', style: 'min-height:44px;cursor:pointer;font-weight:600;display:flex;align-items:center' }), shown]);
+    main.appendChild(el('div', { class: 'row', style: 'margin-bottom:10px' }, [el('button', { class: 'btn primary', onclick: function () {
+      var t = aiPrompt(d);
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('Instrucciones copiadas'); },
+        function () { det.open = true; shown.value = t; shown.focus(); toast('Selecciona y copia las instrucciones'); });
+    }, text: 'Copiar instrucciones' })]));
+    main.appendChild(det);
+
+    main.appendChild(el('div', { class: 'sub', text: '3. Pegar la respuesta' }));
+    main.appendChild(el('p', { class: 'hint', text: 'Copia la respuesta completa de la IA y pégala aquí. Se reemplazan las comidas de los 7 días; después puedes ajustarlas.' }));
+    var ta = el('textarea', { 'aria-label': 'Respuesta de la IA', placeholder: '{ "DESAYUNO": { "LUNES": "…" } … }', style: 'min-height:160px' });
+    var msg = el('p', { class: 'err', role: 'alert' });
+    main.appendChild(ta);
+    main.appendChild(el('div', { class: 'row', style: 'margin-top:8px' }, [el('button', { class: 'btn primary', onclick: function () {
+      msg.textContent = '';
+      var days; try { days = parseAI(ta.value); } catch (e) { msg.textContent = e.message; return; }
+      var has = p.days.some(function (day) { return day.some(function (m) { return m.items.length; }); });
+      if (has && !confirm('Se reemplazarán las comidas de los 7 días de este plan. ¿Continuar?')) return;
+      applyAI(p, days); touch(); persist();
+      S.tab = 'dias'; S.day = 0; render(); focusMain(); toast('Listo. Revisa y ajusta cada día.');
+    }, text: 'Poner en el plan' })]));
+    main.appendChild(msg);
   }
 
   /* ---------- QR ---------- */

@@ -1,4 +1,4 @@
-const CACHE = 'sarenti-v2';
+const CACHE = 'sarenti-v3';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'codec.js', 'vendor/qrcode.js', 'vendor/jsQR.js', 'manifest.webmanifest',
   'img/logo.png', 'img/icon-192.png', 'img/icon-512.png', 'img/icon-180.png',
   'fonts/cormorant-garamond-latin-500-normal.woff2', 'fonts/cormorant-garamond-latin-600-normal.woff2', 'fonts/cormorant-garamond-latin-700-normal.woff2',
