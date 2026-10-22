@@ -64,6 +64,20 @@
   function loadAll() {
     var p = lsGet(K_PLANS), t = lsGet(K_TPL);
     plans = Array.isArray(p) ? p : []; templates = Array.isArray(t) ? t : [];
+    // Planes llenados con IA antes de este arreglo: separa los "\n" que quedaron escritos como texto en un mismo renglón.
+    var fixed = false;
+    plans.concat(templates).forEach(function (pl) {
+      (pl && pl.days || []).forEach(function (day) {
+        (day || []).forEach(function (m) {
+          if (!m || !Array.isArray(m.items) || !m.items.some(function (t) { return typeof t === 'string' && t.indexOf('\\n') >= 0; })) return;
+          m.items = [].concat.apply([], m.items.map(function (t) {
+            return typeof t === 'string' ? t.split('\\n').map(function (x) { return x.trim(); }).filter(Boolean) : [t];
+          }));
+          fixed = true;
+        });
+      });
+    });
+    if (fixed) persist();
   }
   function persist() {
     var ok = lsSet(K_PLANS, plans) && lsSet(K_TPL, templates);
@@ -443,7 +457,7 @@
         if (di < 0) return;
         if (Array.isArray(v)) v = v.join('\n');
         if (typeof v !== 'string') return;
-        var lines = v.split(/\r?\n/).map(function (t) { return t.replace(/^\s*[-•*]\s*/, '').trim(); }).filter(function (t) { return t && t !== '#'; });
+        var lines = v.split(/\r?\n|\\n/).map(function (t) { return t.replace(/^\s*[-•*]\s*/, '').trim(); }).filter(function (t) { return t && t !== '#'; });
         // El nombre del platillo viene con "#". Si la IA no lo puso, la primera línea es nombre cuando no empieza con cantidad y las demás sí.
         var marked = lines.some(function (t) { return t[0] === '#'; }), qty = /^[\d½¼¾]/;
         if (!marked && lines.length > 1 && !qty.test(lines[0]) && lines.slice(1).some(function (t) { return qty.test(t); })) lines[0] = '# ' + lines[0];
