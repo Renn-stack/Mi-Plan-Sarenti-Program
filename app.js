@@ -541,8 +541,10 @@
       '- Las llaves son EXACTAMENTE los renglones de abajo, copiados igual (mismos acentos, mayúsculas y signos). Incluye todos.\n' +
       '- El valor es una lista con un ingrediente por elemento. Ej. "Limón y chile en polvo": ["Limón", "Chile en polvo"].\n' +
       '- Usa SIEMPRE el mismo nombre para el mismo ingrediente en todo el plan, sencillo y en singular: "Limón" (no "jugo de limón", "limones" ni "limón amarillo").\n' +
-      '- Si el renglón ya es un solo ingrediente, devuélvelo IGUAL, sin cambiarle nada: "2 huevos revueltos": ["2 huevos revueltos"].\n' +
-      '- Si separas un renglón con cantidad, deja la cantidad solo donde sea clara: "150 g de salmón con espárragos": ["150 g de salmón", "Espárragos"]. No inventes cantidades.\n' +
+      '- Cada ingrediente lleva UNA sola unidad en todo el plan, la que se usa para comprarlo en el súper: frutas, verduras y huevos en piezas ("2 jitomates", "1 limón"); lo demás en g o ml ("40 g de almendras", "150 g de pechuga", "250 ml de leche"). Usa solo piezas, g o ml.\n' +
+      '- Si un renglón trae el ingrediente en otra unidad, conviértelo a esa unidad de forma aproximada: "10 almendras": ["12 g de almendras"], "100 g de jitomate": ["1 jitomate"], "1 taza de leche": ["240 ml de leche"].\n' +
+      '- Si el renglón ya es un solo ingrediente en su unidad de compra, devuélvelo IGUAL, sin cambiarle nada: "2 huevos revueltos": ["2 huevos revueltos"].\n' +
+      '- Si separas un renglón con cantidad, deja la cantidad solo donde sea clara: "150 g de salmón con espárragos": ["150 g de salmón", "Espárragos"]. Si el renglón no dice cantidad, no la inventes.\n' +
       '- Si no hay nada que comprar (ej. "Agua natural"), usa una lista vacía [].\n\n' +
       'Renglones:\n' + JSON.stringify(lines, null, 1);
   }
