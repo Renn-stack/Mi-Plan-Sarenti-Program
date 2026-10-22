@@ -177,7 +177,7 @@
     if (!items.length) list.appendChild(el('p', { class: 'muted', text: plans.length ? 'No hay coincidencias.' : 'Aún no hay planes. Crea el primero con “+ Nuevo plan”.' }));
     items.forEach(function (p) {
       list.appendChild(el('div', { class: 'plan-item' + (p.id === S.sel ? ' sel' : '') }, [
-        el('button', { class: 'open', 'aria-current': p.id === S.sel ? 'true' : null, onclick: function () { S.sel = p.id; S.view = 'edit'; S.day = 0; S.tab = 'dias'; render(); focusMain(); } }, [
+        el('button', { class: 'open', 'aria-current': p.id === S.sel ? 'true' : null, onclick: function () { S.sel = p.id; S.view = 'edit'; S.day = 0; S.tab = 'dias'; S.toQR = false; render(); focusMain(); } }, [
           el('span', { class: 'nm', text: p.name || 'Sin nombre' }),
           el('span', { class: 'dt', text: 'Actualizado ' + fmtDate(p.updated) })
         ])
@@ -198,7 +198,7 @@
   }
 
   /* ---------- nuevo plan ---------- */
-  function addPlan(p) { plans.push(p); S.sel = p.id; S.view = 'edit'; S.day = 0; S.tab = 'dias'; persist(); render(); focusMain(); }
+  function addPlan(p) { plans.push(p); S.sel = p.id; S.view = 'edit'; S.day = 0; S.tab = 'dias'; S.toQR = false; S.toQR = false; persist(); render(); focusMain(); }
   function buildNew(main) {
     main.appendChild(el('h2', { text: 'Nuevo plan', style: 'margin:12px 0' }));
     var name = el('input', { type: 'text', id: 'nn', placeholder: 'Nombre del paciente', autocomplete: 'off' });
@@ -356,16 +356,16 @@
       el('input', { type: 'text', id: 'pname', value: p.name, autocomplete: 'off', oninput: function (e) { p.name = e.target.value; touch(); } })
     ]));
     main.appendChild(el('div', { class: 'tabs', role: 'group', 'aria-label': 'Sección' }, [
-      el('button', { 'aria-pressed': S.tab === 'dias', onclick: function () { S.tab = 'dias'; render(); }, text: 'Comidas por día' }),
-      el('button', { 'aria-pressed': S.tab === 'general', onclick: function () { S.tab = 'general'; render(); }, text: 'Indicaciones generales' }),
-      el('button', { 'aria-pressed': S.tab === 'ia', onclick: function () { S.tab = 'ia'; render(); }, text: 'Llenar con IA' }),
-      el('button', { 'aria-pressed': S.tab === 'compras', onclick: function () { S.tab = 'compras'; render(); }, text: 'Lista de compras' })
+      el('button', { 'aria-pressed': S.tab === 'dias', onclick: function () { S.toQR = false; S.tab = 'dias'; render(); }, text: 'Comidas por día' }),
+      el('button', { 'aria-pressed': S.tab === 'general', onclick: function () { S.toQR = false; S.tab = 'general'; render(); }, text: 'Indicaciones generales' }),
+      el('button', { 'aria-pressed': S.tab === 'ia', onclick: function () { S.toQR = false; S.tab = 'ia'; render(); }, text: 'Llenar con IA' }),
+      el('button', { 'aria-pressed': S.tab === 'compras', onclick: function () { S.toQR = false; S.tab = 'compras'; render(); }, text: 'Lista de compras' })
     ]));
     if (S.tab === 'dias') editDays(main, p); else if (S.tab === 'ia') buildAI(main, p); else if (S.tab === 'compras') buildShopAI(main, p); else editGeneral(main, p);
 
     main.appendChild(el('div', { class: 'status noprint', id: 'status', role: 'status', 'aria-live': 'polite', text: saved ? 'Guardado' : '', style: 'margin-top:8px' }));
     main.appendChild(el('div', { class: 'row noprint', style: 'margin:12px 0 24px' }, [
-      el('button', { class: 'btn primary', onclick: function () { cleanPlan(p); touch(); persist(); S.view = 'qr'; render(); focusMain(); }, text: 'Generar QR' }),
+      el('button', { class: 'btn primary', onclick: function () { goQR(p, false); }, text: 'Generar QR' }),
       el('button', { class: 'btn', onclick: function () { var c = clone(p); c.id = uid(); c.name = p.name + ' (copia)'; c.updated = nowSec(); plans.push(c); S.sel = c.id; persist(); render(); toast('Plan duplicado'); }, text: 'Duplicar' }),
       el('button', { class: 'btn', onclick: function () { var n = prompt('Nombre de la plantilla (sin datos del paciente):', ''); if (!n) return; var c = clone(p); c.tplName = n.trim(); c.name = ''; delete c.ai; templates.push(c); persist(); toast('Plantilla guardada'); }, text: 'Guardar como plantilla' }),
       el('button', { class: 'btn danger', onclick: function () { if (confirm('¿Eliminar el plan de ' + (p.name || 'este paciente') + '? No se puede deshacer.')) { plans = plans.filter(function (x) { return x !== p; }); persist(); S.sel = null; S.view = 'none'; render(); } }, text: 'Eliminar' })
@@ -563,13 +563,23 @@
     if (!found) throw new Error('No encontré los renglones de este plan en la respuesta. Revisa que pegaste la respuesta de estas instrucciones.');
     return out;
   }
+  /* Antes del QR se pasa por la lista de compras si tiene renglones sin revisar (salvo que la doctora la salte).
+     S.toQR recuerda que venía a generar el QR: al guardar la lista se sigue directo al QR. */
+  function goQR(p, skip) {
+    cleanPlan(p); touch(); persist();
+    if (!skip && shopPending(p).length) { S.tab = 'compras'; S.toQR = true; render(); focusMain(); toast('Antes del QR, revisa la lista de compras'); return; }
+    S.toQR = false; S.view = 'qr'; render(); focusMain();
+  }
   function shopPending(p) { var s = p.shop || {}; return planLines(p).filter(function (t) { return !s.hasOwnProperty(t); }); }
   function buildShopAI(main, p) {
     var lines = planLines(p), pending = shopPending(p);
     main.appendChild(el('p', { class: 'hint', text: 'Al terminar el plan, revisa con ChatGPT u otra IA qué se compra de cada renglón. Así la lista de compras de la app no repite cosas: “Limón y chile en polvo” queda como Limón + Chile en polvo.' }));
     if (!lines.length) { main.appendChild(el('p', { class: 'muted', text: 'Primero llena las comidas del plan.' })); return; }
+    if (S.toQR && pending.length) main.appendChild(el('div', { class: 'card noprint', style: 'margin-bottom:10px' }, [
+      el('p', { style: 'margin:0 0 8px', text: 'Antes de generar el QR, revisa la lista de compras con la IA (pasos 1 y 2). Al guardarla, se genera el QR.' }),
+      el('button', { class: 'btn small', onclick: function () { goQR(p, true); }, text: 'Generar QR sin revisar la lista' })]));
     main.appendChild(el('p', { class: pending.length ? 'err' : 'hint', role: 'status', text: pending.length === lines.length ? 'Aún no se revisa la lista de compras.' :
-      pending.length ? pending.length + ' de ' + lines.length + ' renglones sin revisar (son nuevos o cambiaron). Vuelve a hacer los pasos 1 y 2.' : 'Lista revisada: los ' + lines.length + ' renglones.' }));
+      pending.length ? pending.length + ' de ' + lines.length + (lines.length === 1 ? ' renglón' : ' renglones') + ' sin revisar (son nuevos o cambiaron). Vuelve a hacer los pasos 1 y 2.' : 'Lista revisada: los ' + lines.length + ' renglones.' }));
 
     main.appendChild(el('div', { class: 'sub', text: '1. Copiar las instrucciones' }));
     main.appendChild(el('p', { class: 'hint', text: 'Llevan los alimentos del plan, sin el nombre del paciente. Pégalas en la IA y espera la respuesta.' }));
@@ -586,7 +596,8 @@
     main.appendChild(el('div', { class: 'row', style: 'margin-top:8px' }, [el('button', { class: 'btn primary', onclick: function () {
       msg.textContent = '';
       var r; try { r = parseShopAI(ta.value, lines); } catch (e) { msg.textContent = e.message; return; }
-      p.shop = r; touch(); persist(); render(); toast('Lista de compras revisada');
+      p.shop = r; touch(); persist(); toast('Lista de compras revisada');
+      if (S.toQR) goQR(p, true); else render();
     }, text: 'Guardar lista' })]));
     main.appendChild(msg);
 
@@ -711,7 +722,7 @@
         var pend = shopPending(p).length;
         holder.replaceChildren(wrap.firstChild, el('p', { class: 'hint', text: 'Muéstralo en la pantalla o imprímelo. El paciente lo escanea con Mi Plan Sarenti.' }),
           noShop ? el('p', { class: 'err noprint', text: 'Con la lista de compras revisada el plan ya no cabe en un QR, así que va sin ella: la app arma la lista sola. Para incluirla, acorta algunos textos.' }) :
-          pend ? el('p', { class: 'err noprint', text: 'La lista de compras tiene ' + pend + ' renglones sin revisar. Revísala en la pestaña “Lista de compras” para que no se repitan ingredientes.' }) : '',
+          pend ? el('p', { class: 'err noprint', text: 'La lista de compras tiene ' + (pend === 1 ? '1 renglón' : pend + ' renglones') + ' sin revisar. Revísala en la pestaña “Lista de compras” para que no se repitan ingredientes.' }) : '',
           el('button', { class: 'btn primary noprint', type: 'button', onclick: zoom, text: 'Zoom' }));
         /* Mensaje y código van separados para mandarlos en dos mensajes de WhatsApp. */
         function copy(box, done) {
