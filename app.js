@@ -198,12 +198,12 @@
   }
 
   /* ---------- nuevo plan ---------- */
-  function addPlan(p) { plans.push(p); S.sel = p.id; S.view = 'edit'; S.day = 0; S.tab = 'dias'; S.toQR = false; S.toQR = false; persist(); render(); focusMain(); }
+  function addPlan(p, tab) { plans.push(p); S.sel = p.id; S.view = 'edit'; S.day = 0; S.tab = tab || 'dias'; S.toQR = false; persist(); render(); focusMain(); }
   function buildNew(main) {
     main.appendChild(el('h2', { text: 'Nuevo plan', style: 'margin:12px 0' }));
     var name = el('input', { type: 'text', id: 'nn', placeholder: 'Nombre del paciente', autocomplete: 'off' });
     main.appendChild(el('div', { class: 'field' }, [el('label', { for: 'nn', text: 'Nombre del paciente' }), name]));
-    function make(base) { var p = base ? clone(base) : blankPlan(); p.id = uid(); p.name = name.value.trim() || (base && base.name) || 'Paciente nuevo'; p.updated = nowSec(); addPlan(p); }
+    function make(base) { var p = base ? clone(base) : blankPlan(); p.id = uid(); p.name = name.value.trim() || (base && base.name) || 'Paciente nuevo'; p.updated = nowSec(); addPlan(p, base ? 'dias' : 'ia'); }   // el plan vacío entra a Llenar con IA
     main.appendChild(el('p', { class: 'lbl', text: 'Empezar con:' }));
     var row = el('div', { class: 'row' }, [
       el('button', { class: 'btn primary', onclick: function () { make(null); }, text: 'Plan vacío' }),
@@ -356,9 +356,9 @@
       el('input', { type: 'text', id: 'pname', value: p.name, autocomplete: 'off', oninput: function (e) { p.name = e.target.value; touch(); } })
     ]));
     main.appendChild(el('div', { class: 'tabs', role: 'group', 'aria-label': 'Sección' }, [
+      el('button', { 'aria-pressed': S.tab === 'ia', onclick: function () { S.toQR = false; S.tab = 'ia'; render(); }, text: 'Llenar con IA' }),
       el('button', { 'aria-pressed': S.tab === 'dias', onclick: function () { S.toQR = false; S.tab = 'dias'; render(); }, text: 'Comidas por día' }),
       el('button', { 'aria-pressed': S.tab === 'general', onclick: function () { S.toQR = false; S.tab = 'general'; render(); }, text: 'Indicaciones generales' }),
-      el('button', { 'aria-pressed': S.tab === 'ia', onclick: function () { S.toQR = false; S.tab = 'ia'; render(); }, text: 'Llenar con IA' }),
       el('button', { 'aria-pressed': S.tab === 'compras', onclick: function () { S.toQR = false; S.tab = 'compras'; render(); }, text: 'Lista de compras' })
     ]));
     if (S.tab === 'dias') editDays(main, p); else if (S.tab === 'ia') buildAI(main, p); else if (S.tab === 'compras') buildShopAI(main, p); else editGeneral(main, p);
