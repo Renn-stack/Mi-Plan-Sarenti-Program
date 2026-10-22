@@ -358,9 +358,10 @@
     main.appendChild(el('div', { class: 'tabs', role: 'group', 'aria-label': 'Sección' }, [
       el('button', { 'aria-pressed': S.tab === 'dias', onclick: function () { S.tab = 'dias'; render(); }, text: 'Comidas por día' }),
       el('button', { 'aria-pressed': S.tab === 'general', onclick: function () { S.tab = 'general'; render(); }, text: 'Indicaciones generales' }),
-      el('button', { 'aria-pressed': S.tab === 'ia', onclick: function () { S.tab = 'ia'; render(); }, text: 'Llenar con IA' })
+      el('button', { 'aria-pressed': S.tab === 'ia', onclick: function () { S.tab = 'ia'; render(); }, text: 'Llenar con IA' }),
+      el('button', { 'aria-pressed': S.tab === 'compras', onclick: function () { S.tab = 'compras'; render(); }, text: 'Lista de compras' })
     ]));
-    if (S.tab === 'dias') editDays(main, p); else if (S.tab === 'ia') buildAI(main, p); else editGeneral(main, p);
+    if (S.tab === 'dias') editDays(main, p); else if (S.tab === 'ia') buildAI(main, p); else if (S.tab === 'compras') buildShopAI(main, p); else editGeneral(main, p);
 
     main.appendChild(el('div', { class: 'status noprint', id: 'status', role: 'status', 'aria-live': 'polite', text: saved ? 'Guardado' : '', style: 'margin-top:8px' }));
     main.appendChild(el('div', { class: 'row noprint', style: 'margin:12px 0 24px' }, [
@@ -524,6 +525,79 @@
     main.appendChild(msg);
   }
 
+  /* ---------- lista de compras con IA ---------- */
+  /* Al terminar el plan, la IA dice qué se compra de cada renglón ("Limón y chile en polvo" → Limón, Chile en polvo)
+     con nombres iguales en todo el plan. Se guarda en p.shop y va en el QR (clave c); la app suma por día con eso. */
+  function planLines(p) {   // renglones que se compran (sin nombres de platillo), sin repetir
+    var seen = {}, out = [];
+    p.days.forEach(function (day) { day.forEach(function (m) { m.items.forEach(function (t) { t = t.trim(); if (t && !isDish(t) && !seen[t]) { seen[t] = true; out.push(t); } }); }); });
+    return out;
+  }
+  function shopPrompt(lines) {
+    return 'Eres asistente de una nutrióloga. Abajo están los renglones de un plan de alimentación de 7 días. ' +
+      'Para cada renglón, dime qué hay que comprar en el súper, para armar la lista de compras.\n\n' +
+      'REGLAS (muy importantes):\n' +
+      '- Responde ÚNICAMENTE con un objeto JSON válido. Sin texto antes ni después, sin explicaciones y sin ``` .\n' +
+      '- Las llaves son EXACTAMENTE los renglones de abajo, copiados igual (mismos acentos, mayúsculas y signos). Incluye todos.\n' +
+      '- El valor es una lista con un ingrediente por elemento. Ej. "Limón y chile en polvo": ["Limón", "Chile en polvo"].\n' +
+      '- Usa SIEMPRE el mismo nombre para el mismo ingrediente en todo el plan, sencillo y en singular: "Limón" (no "jugo de limón", "limones" ni "limón amarillo").\n' +
+      '- Si el renglón ya es un solo ingrediente, devuélvelo IGUAL, sin cambiarle nada: "2 huevos revueltos": ["2 huevos revueltos"].\n' +
+      '- Si separas un renglón con cantidad, deja la cantidad solo donde sea clara: "150 g de salmón con espárragos": ["150 g de salmón", "Espárragos"]. No inventes cantidades.\n' +
+      '- Si no hay nada que comprar (ej. "Agua natural"), usa una lista vacía [].\n\n' +
+      'Renglones:\n' + JSON.stringify(lines, null, 1);
+  }
+  function parseShopAI(text, lines) {
+    var a = text.indexOf('{'), b = text.lastIndexOf('}'), o;
+    if (a < 0 || b < a) throw new Error('No encontré la lista en lo que pegaste. Copia la respuesta completa de la IA.');
+    try { o = JSON.parse(text.slice(a, b + 1)); } catch (e) { throw new Error('La respuesta está incompleta o tiene un error. Pide a la IA que la vuelva a escribir solo como JSON.'); }
+    var byNorm = {}, out = {}, found = 0;
+    lines.forEach(function (t) { byNorm[norm(t)] = t; });
+    Object.keys(o || {}).forEach(function (k) {
+      var line = byNorm[norm(k)], v = o[k];
+      if (!line) return;
+      if (typeof v === 'string') v = v ? v.split(/\s*[,;\n]\s*/) : [];
+      if (!Array.isArray(v)) return;
+      out[line] = v.filter(function (t) { return typeof t === 'string' && t.trim(); }).map(function (t) { return t.trim().slice(0, 120); }).slice(0, 10);
+      found++;
+    });
+    if (!found) throw new Error('No encontré los renglones de este plan en la respuesta. Revisa que pegaste la respuesta de estas instrucciones.');
+    return out;
+  }
+  function shopPending(p) { var s = p.shop || {}; return planLines(p).filter(function (t) { return !s.hasOwnProperty(t); }); }
+  function buildShopAI(main, p) {
+    var lines = planLines(p), pending = shopPending(p);
+    main.appendChild(el('p', { class: 'hint', text: 'Al terminar el plan, revisa con ChatGPT u otra IA qué se compra de cada renglón. Así la lista de compras de la app no repite cosas: “Limón y chile en polvo” queda como Limón + Chile en polvo.' }));
+    if (!lines.length) { main.appendChild(el('p', { class: 'muted', text: 'Primero llena las comidas del plan.' })); return; }
+    main.appendChild(el('p', { class: pending.length ? 'err' : 'hint', role: 'status', text: pending.length === lines.length ? 'Aún no se revisa la lista de compras.' :
+      pending.length ? pending.length + ' de ' + lines.length + ' renglones sin revisar (son nuevos o cambiaron). Vuelve a hacer los pasos 1 y 2.' : 'Lista revisada: los ' + lines.length + ' renglones.' }));
+
+    main.appendChild(el('div', { class: 'sub', text: '1. Copiar las instrucciones' }));
+    main.appendChild(el('p', { class: 'hint', text: 'Llevan los alimentos del plan, sin el nombre del paciente. Pégalas en la IA y espera la respuesta.' }));
+    main.appendChild(el('div', { class: 'row', style: 'margin-bottom:10px' }, [el('button', { class: 'btn primary', onclick: function () {
+      var t = shopPrompt(lines);
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('Instrucciones copiadas'); },
+        function () { ta.value = t; ta.focus(); ta.select(); toast('Selecciona y copia las instrucciones'); });
+    }, text: 'Copiar instrucciones' })]));
+
+    main.appendChild(el('div', { class: 'sub', text: '2. Pegar la respuesta' }));
+    var ta = el('textarea', { 'aria-label': 'Respuesta de la IA', placeholder: '{ "Limón y chile en polvo": ["Limón", "Chile en polvo"], … }', style: 'min-height:140px' });
+    var msg = el('p', { class: 'err', role: 'alert' });
+    main.appendChild(ta);
+    main.appendChild(el('div', { class: 'row', style: 'margin-top:8px' }, [el('button', { class: 'btn primary', onclick: function () {
+      msg.textContent = '';
+      var r; try { r = parseShopAI(ta.value, lines); } catch (e) { msg.textContent = e.message; return; }
+      p.shop = r; touch(); persist(); render(); toast('Lista de compras revisada');
+    }, text: 'Guardar lista' })]));
+    main.appendChild(msg);
+
+    /* Para que la doctora vea qué cambió: solo los renglones que la IA separó o renombró. */
+    var s = p.shop || {}, changed = lines.filter(function (t) { return s[t] && !(s[t].length === 1 && s[t][0] === t); });
+    if (changed.length) {
+      main.appendChild(el('div', { class: 'sub', text: 'Lo que se compra' }));
+      main.appendChild(el('ul', { class: 'hint' }, changed.map(function (t) { return el('li', { text: t + ' → ' + (s[t].length ? s[t].join(' · ') : 'nada') }); })));
+    }
+  }
+
   /* ---------- QR ---------- */
   function makeQR(text) {
     var last;
@@ -616,40 +690,52 @@
     var fontReady = document.fonts ? document.fonts.load('700 20px "Cormorant Garamond"').catch(function () {}) : null;
     Promise.all([SarentiCodec.encode(p), fontReady]).then(function (r) {
       var code = r[0], res;
-      try { res = makeQR(code); } catch (e) { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: e.message })); return; }
-      var wrap = el('div'); wrap.innerHTML = qrSvg(res.q, p.name || 'Paciente');
-      /* Zoom: el QR a pantalla completa para que el paciente lo escanee del monitor o del celular. */
-      function zoom() {
-        var big = el('div', { class: 'zoom-qr' }); big.innerHTML = qrSvg(res.q, p.name || 'Paciente');
-        var dlg = el('dialog', { class: 'zoom', 'aria-label': 'Código QR en grande' }, [
-          el('button', { class: 'btn primary', type: 'button', onclick: function () { dlg.close(); }, text: '← Atrás' }), big]);
-        dlg.addEventListener('close', function () { dlg.remove(); });
-        document.body.appendChild(dlg); dlg.showModal();
+      var noShop = false;
+      try { res = makeQR(code); } catch (e) {
+        /* Si con la lista de compras ya no cabe, se manda sin ella: la app arma la lista sola. */
+        var bare = clone(p); delete bare.shop;
+        return SarentiCodec.encode(bare).then(function (c2) { code = c2; res = makeQR(code); noShop = true; show(); })
+          .catch(function (e2) { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: e2.message })); });
       }
-      holder.replaceChildren(wrap.firstChild, el('p', { class: 'hint', text: 'Muéstralo en la pantalla o imprímelo. El paciente lo escanea con Mi Plan Sarenti.' }),
-        el('button', { class: 'btn primary noprint', type: 'button', onclick: zoom, text: 'Zoom' }));
-      /* Mensaje y código van separados para mandarlos en dos mensajes de WhatsApp. */
-      function copy(box, done) {
-        (navigator.clipboard ? navigator.clipboard.writeText(box.value) : Promise.reject()).then(function () { toast(done); }, function () { box.focus(); box.select(); toast('Selecciona y copia el texto'); });
+      show();
+      function show() {
+        var wrap = el('div'); wrap.innerHTML = qrSvg(res.q, p.name || 'Paciente');
+        /* Zoom: el QR a pantalla completa para que el paciente lo escanee del monitor o del celular. */
+        function zoom() {
+          var big = el('div', { class: 'zoom-qr' }); big.innerHTML = qrSvg(res.q, p.name || 'Paciente');
+          var dlg = el('dialog', { class: 'zoom', 'aria-label': 'Código QR en grande' }, [
+            el('button', { class: 'btn primary', type: 'button', onclick: function () { dlg.close(); }, text: '← Atrás' }), big]);
+          dlg.addEventListener('close', function () { dlg.remove(); });
+          document.body.appendChild(dlg); dlg.showModal();
+        }
+        var pend = shopPending(p).length;
+        holder.replaceChildren(wrap.firstChild, el('p', { class: 'hint', text: 'Muéstralo en la pantalla o imprímelo. El paciente lo escanea con Mi Plan Sarenti.' }),
+          noShop ? el('p', { class: 'err noprint', text: 'Con la lista de compras revisada el plan ya no cabe en un QR, así que va sin ella: la app arma la lista sola. Para incluirla, acorta algunos textos.' }) :
+          pend ? el('p', { class: 'err noprint', text: 'La lista de compras tiene ' + pend + ' renglones sin revisar. Revísala en la pestaña “Lista de compras” para que no se repitan ingredientes.' }) : '',
+          el('button', { class: 'btn primary noprint', type: 'button', onclick: zoom, text: 'Zoom' }));
+        /* Mensaje y código van separados para mandarlos en dos mensajes de WhatsApp. */
+        function copy(box, done) {
+          (navigator.clipboard ? navigator.clipboard.writeText(box.value) : Promise.reject()).then(function () { toast(done); }, function () { box.focus(); box.select(); toast('Selecciona y copia el texto'); });
+        }
+        var mbox = el('textarea', { 'aria-label': 'Mensaje para WhatsApp', style: 'min-height:80px' });
+        mbox.value = 'Hola, te comparto tu plan de alimentación de Mi Plan Sarenti. En el siguiente mensaje va tu código: cópialo completo y en la app elige “Código manual”.';
+        var ta = el('textarea', { readonly: true, 'aria-label': 'Código del plan', onfocus: function (e) { e.target.select(); } }); ta.value = code;
+        main.appendChild(el('div', { class: 'sub noprint', text: 'Mensaje' }));
+        main.appendChild(el('p', { class: 'hint noprint', text: 'Para pacientes que lo reciben por WhatsApp en lugar de escanear. Mándalo primero; puedes cambiar el texto.' }));
+        main.appendChild(mbox);
+        main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [el('button', { class: 'btn primary', onclick: function () { copy(mbox, 'Mensaje copiado'); }, text: 'Copiar mensaje' })]));
+        main.appendChild(el('div', { class: 'sub noprint', text: 'Código manual' }));
+        main.appendChild(el('p', { class: 'hint noprint', text: 'Mándalo en un mensaje aparte, sin cambiarlo.' }));
+        main.appendChild(ta);
+        main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [el('button', { class: 'btn primary', onclick: function () { copy(ta, 'Código copiado'); }, text: 'Copiar código' })]));
+        main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [
+          el('a', { class: 'btn', href: '#', onclick: function (e) { e.preventDefault(); window.open('https://wa.me/?text=' + encodeURIComponent(mbox.value + '\n\n' + code), '_blank', 'noopener'); }, text: 'Enviar todo junto por WhatsApp' }),
+          el('button', { class: 'btn', onclick: function () { qrPng(res.q, p.name || 'Paciente').toBlob(function (b) { download(b, 'plan-' + slug(p.name) + '.png'); }); }, text: 'Descargar corazón (PNG)' }),
+          el('button', { class: 'btn', onclick: function () { window.print(); }, text: 'Imprimir' })
+        ]));
+        main.appendChild(el('p', { class: 'hint noprint', text: 'El PNG es el corazón digital: en WhatsApp mándalo como Documento (no como foto) para que no pierda calidad. El paciente lo guarda y en la app elige “Adjuntar corazón digital”.' }));
+        main.appendChild(el('p', { class: 'hint noprint', text: 'Tamaño del código: ' + code.length + ' caracteres (nivel de corrección ' + res.level + ').' }));
       }
-      var mbox = el('textarea', { 'aria-label': 'Mensaje para WhatsApp', style: 'min-height:80px' });
-      mbox.value = 'Hola, te comparto tu plan de alimentación de Mi Plan Sarenti. En el siguiente mensaje va tu código: cópialo completo y en la app elige “Código manual”.';
-      var ta = el('textarea', { readonly: true, 'aria-label': 'Código del plan', onfocus: function (e) { e.target.select(); } }); ta.value = code;
-      main.appendChild(el('div', { class: 'sub noprint', text: 'Mensaje' }));
-      main.appendChild(el('p', { class: 'hint noprint', text: 'Para pacientes que lo reciben por WhatsApp en lugar de escanear. Mándalo primero; puedes cambiar el texto.' }));
-      main.appendChild(mbox);
-      main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [el('button', { class: 'btn primary', onclick: function () { copy(mbox, 'Mensaje copiado'); }, text: 'Copiar mensaje' })]));
-      main.appendChild(el('div', { class: 'sub noprint', text: 'Código manual' }));
-      main.appendChild(el('p', { class: 'hint noprint', text: 'Mándalo en un mensaje aparte, sin cambiarlo.' }));
-      main.appendChild(ta);
-      main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [el('button', { class: 'btn primary', onclick: function () { copy(ta, 'Código copiado'); }, text: 'Copiar código' })]));
-      main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [
-        el('a', { class: 'btn', href: '#', onclick: function (e) { e.preventDefault(); window.open('https://wa.me/?text=' + encodeURIComponent(mbox.value + '\n\n' + code), '_blank', 'noopener'); }, text: 'Enviar todo junto por WhatsApp' }),
-        el('button', { class: 'btn', onclick: function () { qrPng(res.q, p.name || 'Paciente').toBlob(function (b) { download(b, 'plan-' + slug(p.name) + '.png'); }); }, text: 'Descargar corazón (PNG)' }),
-        el('button', { class: 'btn', onclick: function () { window.print(); }, text: 'Imprimir' })
-      ]));
-      main.appendChild(el('p', { class: 'hint noprint', text: 'El PNG es el corazón digital: en WhatsApp mándalo como Documento (no como foto) para que no pierda calidad. El paciente lo guarda y en la app elige “Adjuntar corazón digital”.' }));
-      main.appendChild(el('p', { class: 'hint noprint', text: 'Tamaño del código: ' + code.length + ' caracteres (nivel de corrección ' + res.level + ').' }));
     }, function () { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: 'Este navegador no puede generar el código. Usa una versión reciente de Chrome, Edge, Safari o Firefox.' })); });
   }
 

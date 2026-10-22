@@ -5,6 +5,19 @@
   'use strict';
   var PREFIX = 'SARENTI1.';
 
+  /* c: lo que se compra de cada renglón (revisado con IA). Solo van los renglones que siguen en el plan
+     y que cambian algo: si la IA devolvió el renglón igual, la app ya lo lee así. */
+  function shopCompact(p) {
+    var used = {}, out = {}, n = 0;
+    p.days.forEach(function (day) { day.forEach(function (m) { m.items.forEach(function (t) { used[t] = true; }); }); });
+    Object.keys(p.shop || {}).forEach(function (k) {
+      var v = p.shop[k];
+      if (!used[k] || !Array.isArray(v) || (v.length === 1 && v[0] === k)) return;
+      out[k] = v; n++;
+    });
+    return n ? out : undefined;
+  }
+
   function toCompact(p) {
     return {
       v: 1,
@@ -17,7 +30,8 @@
       p: p.prep,
       w: p.days.map(function (day) {
         return day.map(function (m) { return [m.name, m.time, m.items]; });
-      })
+      }),
+      c: shopCompact(p)
     };
   }
 
@@ -29,6 +43,15 @@
     if (x === undefined) return [];
     if (!Array.isArray(x)) throw new Error('Código inválido');
     return x.slice(0, maxItems).map(function (s) { return str(s, maxLen); });
+  }
+
+  function shopList(x) {   // opcional: si viene mal se ignora
+    var out = {};
+    if (!x || typeof x !== 'object' || Array.isArray(x)) return out;
+    Object.keys(x).slice(0, 400).forEach(function (k) {
+      if (Array.isArray(x[k])) out[k] = x[k].filter(function (t) { return typeof t === 'string'; }).slice(0, 10).map(function (t) { return t.slice(0, 120); });
+    });
+    return out;
   }
 
   function fromCompact(c) {
@@ -44,6 +67,7 @@
       daily: strList(c.d, 30, 200),
       avoid: strList(c.a, 30, 200),
       prep: strList(c.p, 30, 300),
+      shop: shopList(c.c),
       days: c.w.map(function (day) {
         if (!Array.isArray(day)) throw new Error('Código inválido');
         return day.slice(0, 12).map(function (m) {
