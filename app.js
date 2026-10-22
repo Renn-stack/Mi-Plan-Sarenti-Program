@@ -737,6 +737,21 @@
         }
         var mbox = el('textarea', { 'aria-label': 'Mensaje para WhatsApp', style: 'min-height:80px' });
         mbox.value = 'Hola, te comparto tu plan de alimentación de Mi Plan Sarenti. En el siguiente mensaje va tu código: cópialo completo y en la app elige “Código manual”.';
+        /* El corazón en PNG se manda con el menú Compartir del teléfono o la Mac (ahí se elige WhatsApp): un enlace de
+           WhatsApp solo lleva texto. El archivo se prepara antes, porque Safari solo deja compartir justo al tocar el botón. */
+        var pngName = 'plan-' + slug(p.name) + '.png', pngBlob = null, pngText = 'Hola, te comparto tu plan de alimentación de Mi Plan Sarenti. Guarda la imagen del corazón y en la app elige “Adjuntar corazón digital”.';
+        qrPng(res.q, p.name || 'Paciente').toBlob(function (b) { pngBlob = b; });
+        function sendPng() {
+          if (!pngBlob) return toast('Preparando la imagen, intenta de nuevo');
+          var f = new File([pngBlob], pngName, { type: 'image/png' });
+          if (navigator.canShare && navigator.canShare({ files: [f] })) {
+            navigator.share({ files: [f], text: pngText }).catch(function () {});
+          } else {   // sin Compartir: se descarga y se abre WhatsApp para adjuntarla
+            download(pngBlob, pngName);
+            window.open('https://wa.me/?text=' + encodeURIComponent(pngText), '_blank', 'noopener');
+            toast('Se descargó el corazón: adjúntalo en WhatsApp');
+          }
+        }
         var ta = el('textarea', { readonly: true, 'aria-label': 'Código del plan', onfocus: function (e) { e.target.select(); } }); ta.value = code;
         main.appendChild(el('div', { class: 'sub noprint', text: 'Mensaje' }));
         main.appendChild(el('p', { class: 'hint noprint', text: 'Para pacientes que lo reciben por WhatsApp en lugar de escanear. Mándalo primero; puedes cambiar el texto.' }));
@@ -747,11 +762,11 @@
         main.appendChild(ta);
         main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [el('button', { class: 'btn primary', onclick: function () { copy(ta, 'Código copiado'); }, text: 'Copiar código' })]));
         main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [
-          el('a', { class: 'btn', href: '#', onclick: function (e) { e.preventDefault(); window.open('https://wa.me/?text=' + encodeURIComponent(mbox.value + '\n\n' + code), '_blank', 'noopener'); }, text: 'Enviar todo junto por WhatsApp' }),
+          el('button', { class: 'btn', onclick: sendPng, text: 'Enviar corazón por WhatsApp' }),
           el('button', { class: 'btn', onclick: function () { qrPng(res.q, p.name || 'Paciente').toBlob(function (b) { download(b, 'plan-' + slug(p.name) + '.png'); }); }, text: 'Descargar corazón (PNG)' }),
           el('button', { class: 'btn', onclick: function () { window.print(); }, text: 'Imprimir' })
         ]));
-        main.appendChild(el('p', { class: 'hint noprint', text: 'El PNG es el corazón digital: en WhatsApp mándalo como Documento (no como foto) para que no pierda calidad. El paciente lo guarda y en la app elige “Adjuntar corazón digital”.' }));
+        main.appendChild(el('p', { class: 'hint noprint', text: '“Enviar corazón por WhatsApp” abre el menú Compartir con el corazón en PNG: elige WhatsApp y al paciente. El paciente lo guarda y en la app elige “Adjuntar corazón digital”.' }));
         main.appendChild(el('p', { class: 'hint noprint', text: 'Tamaño del código: ' + code.length + ' caracteres (nivel de corrección ' + res.level + ').' }));
       }
     }, function () { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: 'Este navegador no puede generar el código. Usa una versión reciente de Chrome, Edge, Safari o Firefox.' })); });
