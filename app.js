@@ -398,13 +398,14 @@
     main.appendChild(dayRow);
     main.appendChild(el('h2', { text: DAYS[S.day], style: 'margin-bottom:10px' }));
     var meals = p.days[S.day];
+    function foodChanged() { resetShop(p); touch(); }
     meals.forEach(function (m, mi) {
-      var items = listEditor(m.items, 'Alimento', 'Ej. 2 huevos', touch, true);
+      var items = listEditor(m.items, 'Alimento', 'Ej. 2 huevos', foodChanged, true);
       main.appendChild(el('section', { class: 'card meal', 'aria-label': m.name }, [
         el('div', { class: 'head' }, [
           el('input', { type: 'text', value: m.name, 'aria-label': 'Nombre de la comida', oninput: function (e) { m.name = e.target.value; touch(); } }),
           el('input', { type: 'time', value: m.time, 'aria-label': 'Hora de ' + m.name, oninput: function (e) { m.time = e.target.value || m.time; touch(); } }),
-          el('button', { class: 'icon-btn', 'aria-label': 'Quitar la comida ' + m.name, onclick: function () { if (!m.items.length || confirm('¿Quitar “' + m.name + '” de este día?')) { meals.splice(mi, 1); touch(); render(); } }, text: '✕' })
+          el('button', { class: 'icon-btn', 'aria-label': 'Quitar la comida ' + m.name, onclick: function () { if (!m.items.length || confirm('¿Quitar “' + m.name + '” de este día?')) { var had = m.items.length; meals.splice(mi, 1); if (had) foodChanged(); else touch(); render(); } }, text: '✕' })
         ]), items
       ]));
     });
@@ -416,7 +417,7 @@
       el('div', { class: 'row' }, boxes),
       el('button', { class: 'btn small', style: 'margin-top:8px', onclick: function () {
         var any = false; det.querySelectorAll('input:checked').forEach(function (c) { p.days[+c.value] = clone(meals); any = true; });
-        if (any) { touch(); render(); toast('Día copiado'); } else toast('Elige al menos un día');
+        if (any) { foodChanged(); render(); toast('Día copiado'); } else toast('Elige al menos un día');
       }, text: 'Copiar' })
     ]);
     main.appendChild(det);
@@ -523,7 +524,7 @@
       var days; try { days = parseAI(ta.value); } catch (e) { msg.textContent = e.message; return; }
       var has = p.days.some(function (day) { return day.some(function (m) { return m.items.length; }); });
       if (has && !confirm('Se reemplazarán las comidas de los 7 días de este plan. ¿Continuar?')) return;
-      applyAI(p, days); touch(); persist();
+      applyAI(p, days); resetShop(p); touch(); persist();
       S.tab = 'dias'; S.day = 0; render(); focusMain(); toast('Listo. Revisa y ajusta cada día.');
     }, text: 'Poner en el plan' })]));
     main.appendChild(msg);
@@ -575,13 +576,18 @@
     if (shopPending(p).length) { S.view = 'edit'; S.tab = 'compras'; render(); focusMain(); toast('Antes del QR, revisa la lista de compras'); return; }
     S.view = 'qr'; render(); focusMain();
   }
+  /* Si cambia la comida del plan, la lista revisada se borra completa: la IA la vuelve a hacer con el plan nuevo
+     (las unidades de compra dependen de todo el plan). */
+  function resetShop(p) {
+    if (!p.shop || !Object.keys(p.shop).length) return;
+    p.shop = {}; toast('Cambió la comida: hay que revisar otra vez la lista de compras');
+  }
   function shopPending(p) { var s = p.shop || {}; return planLines(p).filter(function (t) { return !s.hasOwnProperty(t); }); }
   function buildShopAI(main, p) {
     var lines = planLines(p), pending = shopPending(p);
-    main.appendChild(el('p', { class: 'hint', text: 'Al terminar el plan, revisa con ChatGPT u otra IA qué se compra de cada renglón. Así la lista de compras de la app no repite cosas: “Limón y chile en polvo” queda como Limón + Chile en polvo.' }));
     if (!lines.length) { main.appendChild(el('p', { class: 'muted', text: 'Primero llena las comidas del plan.' })); return; }
-    main.appendChild(el('p', { class: pending.length ? 'err' : 'hint', role: 'status', text: pending.length === lines.length ? 'Aún no se revisa la lista de compras.' :
-      pending.length ? pending.length + ' de ' + lines.length + (lines.length === 1 ? ' renglón' : ' renglones') + ' sin revisar (son nuevos, cambiaron o la IA no los incluyó): ' + pending.join(' · ') + '. Vuelve a hacer los pasos 1 y 2.' : 'Lista revisada: los ' + lines.length + ' renglones.' }));
+    if (pending.length) main.appendChild(el('p', { class: 'err', role: 'status', text: pending.length === lines.length ? 'Aún no se revisa la lista de compras.' :
+      pending.length + ' de ' + lines.length + (lines.length === 1 ? ' renglón' : ' renglones') + ' sin revisar (la IA no los incluyó): ' + pending.join(' · ') + '. Vuelve a hacer los pasos 1 y 2.' }));
 
     main.appendChild(el('div', { class: 'sub', text: '1. Copiar las instrucciones' }));
     main.appendChild(el('p', { class: 'hint', text: 'Llevan los alimentos del plan, sin el nombre del paciente. Pégalas en la IA y espera la respuesta.' }));
