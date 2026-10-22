@@ -248,10 +248,13 @@
   /* ---------- escanear QR ---------- */
   var scanStop = null;
   function stopScan() { if (scanStop) { scanStop(); scanStop = null; } }
-  function readQR(src, w, h, cv) {
+  /* crop = [x, y, lado] de la imagen original: solo se lee ese cuadro (sin reducirlo) para que el QR del corazón,
+     que es denso (~110 cuadritos por lado), no pierda nitidez. */
+  function readQR(src, w, h, cv, crop) {
     cv.width = w; cv.height = h;
-    var g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(src, 0, 0, w, h);
-    var r = jsQR(g.getImageData(0, 0, w, h).data, w, h);
+    var g = cv.getContext('2d', { willReadFrequently: true });
+    if (crop) g.drawImage(src, crop[0], crop[1], crop[2], crop[2], 0, 0, w, h); else g.drawImage(src, 0, 0, w, h);
+    var r = jsQR(g.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' });
     return r && r.data;
   }
   function fit(w, h, max) { var s = Math.min(1, max / Math.max(w, h)); return [Math.round(w * s), Math.round(h * s)]; }
@@ -272,16 +275,20 @@
     } });
     var cam = el('button', { class: 'btn primary', type: 'button', text: 'Abrir cámara', onclick: function () {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'Este navegador no puede usar la cámara. Sube una foto del QR.'; return; }
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(function (stream) {
+      /* Sin pedir resolución, Safari en iPhone da 640×480 y los cuadritos del QR quedan de ~1.5 px: no se lee. */
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (stream) {
         stopScan();
-        var alive = true, timer = null;
+        var alive = true, timer = null, n = 0;
         scanStop = function () { alive = false; clearTimeout(timer); stream.getTracks().forEach(function (t) { t.stop(); }); video.remove(); cam.hidden = false; stop.hidden = true; };
         video.srcObject = stream; box.prepend(video); video.play().catch(function () {});
-        cam.hidden = true; stop.hidden = false; msg.textContent = 'Apunta la cámara al QR.';
+        cam.hidden = true; stop.hidden = false; msg.textContent = 'Apunta la cámara al corazón y déjalo en el centro.';
         (function tick() {
           if (!alive) return;
           if (video.readyState >= 2 && video.videoWidth) {
-            var d = fit(video.videoWidth, video.videoHeight, 800), t = readQR(video, d[0], d[1], cv);
+            /* Se alterna: el cuadro del centro a resolución completa (hasta 1200 px) y la imagen entera reducida. */
+            var vw = video.videoWidth, vh = video.videoHeight, c = Math.min(vw, vh), e = Math.min(c, 1200), t;
+            if (n++ % 2 === 0) t = readQR(video, e, e, cv, [(vw - c) / 2, (vh - c) / 2, c]);
+            else { var d = fit(vw, vh, 1200); t = readQR(video, d[0], d[1], cv); }
             if (t) { stopScan(); msg.textContent = ''; onCode(t); return; }
           }
           timer = setTimeout(tick, 150);
