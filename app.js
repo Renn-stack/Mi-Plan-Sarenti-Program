@@ -365,7 +365,7 @@
 
     main.appendChild(el('div', { class: 'status noprint', id: 'status', role: 'status', 'aria-live': 'polite', text: saved ? 'Guardado' : '', style: 'margin-top:8px' }));
     main.appendChild(el('div', { class: 'row noprint', style: 'margin:12px 0 24px' }, [
-      el('button', { class: 'btn primary', onclick: function () { goQR(p, false); }, text: 'Generar QR' }),
+      el('button', { class: 'btn primary', onclick: function () { goQR(p); }, text: 'Generar QR' }),
       el('button', { class: 'btn', onclick: function () { var c = clone(p); c.id = uid(); c.name = p.name + ' (copia)'; c.updated = nowSec(); plans.push(c); S.sel = c.id; persist(); render(); toast('Plan duplicado'); }, text: 'Duplicar' }),
       el('button', { class: 'btn', onclick: function () { var n = prompt('Nombre de la plantilla (sin datos del paciente):', ''); if (!n) return; var c = clone(p); c.tplName = n.trim(); c.name = ''; delete c.ai; templates.push(c); persist(); toast('Plantilla guardada'); }, text: 'Guardar como plantilla' }),
       el('button', { class: 'btn danger', onclick: function () { if (confirm('¿Eliminar el plan de ' + (p.name || 'este paciente') + '? No se puede deshacer.')) { plans = plans.filter(function (x) { return x !== p; }); persist(); S.sel = null; S.view = 'none'; render(); } }, text: 'Eliminar' })
@@ -565,11 +565,11 @@
     if (!found) throw new Error('No encontré los renglones de este plan en la respuesta. Revisa que pegaste la respuesta de estas instrucciones.');
     return out;
   }
-  /* Antes del QR se pasa por la lista de compras si tiene renglones sin revisar (salvo que la doctora la salte).
-     S.toQR recuerda que venía a generar el QR: al guardar la lista se sigue directo al QR. */
-  function goQR(p, skip) {
+  /* Nunca hay QR sin la lista de compras revisada: si falta algún renglón se va a la pestaña de la lista.
+     S.toQR recuerda que venía a generar el QR: al guardar la lista completa se sigue directo al QR. */
+  function goQR(p) {
     cleanPlan(p); touch(); persist();
-    if (!skip && shopPending(p).length) { S.tab = 'compras'; S.toQR = true; render(); focusMain(); toast('Antes del QR, revisa la lista de compras'); return; }
+    if (shopPending(p).length) { S.view = 'edit'; S.tab = 'compras'; S.toQR = true; render(); focusMain(); toast('Antes del QR, revisa la lista de compras'); return; }
     S.toQR = false; S.view = 'qr'; render(); focusMain();
   }
   function shopPending(p) { var s = p.shop || {}; return planLines(p).filter(function (t) { return !s.hasOwnProperty(t); }); }
@@ -578,10 +578,9 @@
     main.appendChild(el('p', { class: 'hint', text: 'Al terminar el plan, revisa con ChatGPT u otra IA qué se compra de cada renglón. Así la lista de compras de la app no repite cosas: “Limón y chile en polvo” queda como Limón + Chile en polvo.' }));
     if (!lines.length) { main.appendChild(el('p', { class: 'muted', text: 'Primero llena las comidas del plan.' })); return; }
     if (S.toQR && pending.length) main.appendChild(el('div', { class: 'card noprint', style: 'margin-bottom:10px' }, [
-      el('p', { style: 'margin:0 0 8px', text: 'Antes de generar el QR, revisa la lista de compras con la IA (pasos 1 y 2). Al guardarla, se genera el QR.' }),
-      el('button', { class: 'btn small', onclick: function () { goQR(p, true); }, text: 'Generar QR sin revisar la lista' })]));
+      el('p', { style: 'margin:0', text: 'Antes de generar el QR, revisa la lista de compras con la IA (pasos 1 y 2). Al guardarla, se genera el QR.' })]));
     main.appendChild(el('p', { class: pending.length ? 'err' : 'hint', role: 'status', text: pending.length === lines.length ? 'Aún no se revisa la lista de compras.' :
-      pending.length ? pending.length + ' de ' + lines.length + (lines.length === 1 ? ' renglón' : ' renglones') + ' sin revisar (son nuevos o cambiaron). Vuelve a hacer los pasos 1 y 2.' : 'Lista revisada: los ' + lines.length + ' renglones.' }));
+      pending.length ? pending.length + ' de ' + lines.length + (lines.length === 1 ? ' renglón' : ' renglones') + ' sin revisar (son nuevos, cambiaron o la IA no los incluyó): ' + pending.join(' · ') + '. Vuelve a hacer los pasos 1 y 2.' : 'Lista revisada: los ' + lines.length + ' renglones.' }));
 
     main.appendChild(el('div', { class: 'sub', text: '1. Copiar las instrucciones' }));
     main.appendChild(el('p', { class: 'hint', text: 'Llevan los alimentos del plan, sin el nombre del paciente. Pégalas en la IA y espera la respuesta.' }));
@@ -598,8 +597,11 @@
     main.appendChild(el('div', { class: 'row', style: 'margin-top:8px' }, [el('button', { class: 'btn primary', onclick: function () {
       msg.textContent = '';
       var r; try { r = parseShopAI(ta.value, lines); } catch (e) { msg.textContent = e.message; return; }
-      p.shop = r; touch(); persist(); toast('Lista de compras revisada');
-      if (S.toQR) goQR(p, true); else render();
+      /* Se suma a lo ya revisado: si la IA dejó fuera renglones, siguen pendientes y no hay QR todavía. */
+      p.shop = Object.assign({}, p.shop, r); touch(); persist();
+      var left = shopPending(p).length;
+      toast(left ? 'Faltan ' + left + (left === 1 ? ' renglón' : ' renglones') + ' por revisar' : 'Lista de compras revisada');
+      if (S.toQR && !left) goQR(p); else render();
     }, text: 'Guardar lista' })]));
     main.appendChild(msg);
 
@@ -697,19 +699,18 @@
   function slug(s) { return (s || 'plan').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'plan'; }
 
   function buildQR(main, p) {
+    if (shopPending(p).length) {   // por si se llega aquí sin pasar por goQR
+      main.appendChild(el('p', { class: 'err', role: 'alert', text: 'Antes de generar el QR, revisa la lista de compras.' }));
+      main.appendChild(el('button', { class: 'btn primary', onclick: function () { goQR(p); }, text: 'Ir a la lista de compras' }));
+      return;
+    }
     main.appendChild(el('div', { class: 'row noprint', style: 'margin:8px 0' }, [el('button', { class: 'btn small', onclick: function () { S.view = 'edit'; render(); focusMain(); }, text: '← Volver al plan' })]));
     var holder = el('div', { class: 'qrbox' }, [el('p', { class: 'muted', text: 'Generando…' })]);
     main.appendChild(holder);
     var fontReady = document.fonts ? document.fonts.load('700 20px "Cormorant Garamond"').catch(function () {}) : null;
     Promise.all([SarentiCodec.encode(p), fontReady]).then(function (r) {
       var code = r[0], res;
-      var noShop = false;
-      try { res = makeQR(code); } catch (e) {
-        /* Si con la lista de compras ya no cabe, se manda sin ella: la app arma la lista sola. */
-        var bare = clone(p); delete bare.shop;
-        return SarentiCodec.encode(bare).then(function (c2) { code = c2; res = makeQR(code); noShop = true; show(); })
-          .catch(function (e2) { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: e2.message })); });
-      }
+      try { res = makeQR(code); } catch (e) { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: e.message })); return; }
       show();
       function show() {
         var wrap = el('div'); wrap.innerHTML = qrSvg(res.q, p.name || 'Paciente');
@@ -721,10 +722,7 @@
           dlg.addEventListener('close', function () { dlg.remove(); });
           document.body.appendChild(dlg); dlg.showModal();
         }
-        var pend = shopPending(p).length;
         holder.replaceChildren(wrap.firstChild, el('p', { class: 'hint', text: 'Muéstralo en la pantalla o imprímelo. El paciente lo escanea con Mi Plan Sarenti.' }),
-          noShop ? el('p', { class: 'err noprint', text: 'Con la lista de compras revisada el plan ya no cabe en un QR, así que va sin ella: la app arma la lista sola. Para incluirla, acorta algunos textos.' }) :
-          pend ? el('p', { class: 'err noprint', text: 'La lista de compras tiene ' + (pend === 1 ? '1 renglón' : pend + ' renglones') + ' sin revisar. Revísala en la pestaña “Lista de compras” para que no se repitan ingredientes.' }) : '',
           el('button', { class: 'btn primary noprint', type: 'button', onclick: zoom, text: 'Zoom' }));
         /* Mensaje y código van separados para mandarlos en dos mensajes de WhatsApp. */
         function copy(box, done) {
