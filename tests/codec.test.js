@@ -37,5 +37,34 @@ function plan(items) {
   big.days.forEach(d => d.forEach(m => m.items.forEach(t => { big.shop[t] = [t.split(' alimento')[0], 'Sal', 'Limón']; })));
   const sizeA = (await C.encode(plan(6))).length, sizeB = (await C.encode(big)).length;
   console.log(`con lista revisada: ${sizeA} → ${sizeB} chars`);
+  // v2: para planes que no caben en un QR v1, como un plan real de 7 días con la lista de compras revisada.
+  const real = plan(0); const D = real.days;
+  const txt = [
+    ['# Huevos a la mexicana con tortillas', '2 huevos revueltos', '1/2 taza de jitomate, cebolla y chile al gusto', '2 tortillas de maíz', '1/4 de aguacate', '1 cucharadita de aceite de oliva', 'Café o té sin azúcar'],
+    ['1 manzana pequeña', '10 almendras naturales'],
+    ['# Pollo a la plancha con arroz integral', '120–150 g de pechuga de pollo cocida', '1/2 taza de arroz integral cocido', '1 taza de calabacitas y zanahorias al vapor', '2 tazas de ensalada verde', '1 cucharadita de aceite de oliva', 'Agua natural'],
+    ['1 yogur griego natural sin azúcar, aproximadamente 125 g', '1 cucharadita de semillas de chía'],
+    ['# Ensalada de atún con aguacate', '1 lata de atún en agua escurrido, aproximadamente 120 g', '2 tazas de lechuga, pepino y jitomate', '1/4 de aguacate', '2 tostadas horneadas de maíz', 'Limón y hierbas al gusto']];
+  D.forEach((d, i) => d.forEach((m, j) => { m.items = txt[j].map(t => t.startsWith('# ') || i === 0 ? t : t.replace(/^(\d+)/, n => String(+n + i))); }));
+  real.shop = {};
+  D.forEach(d => d.forEach(m => m.items.forEach(t => { if (!t.startsWith('# ')) real.shop[t] = t.split(/ y |, | de /).slice(0, 3).map(x => '1 ' + x.trim()); })));
+  real.shop['Agua natural'] = [];
+  const c1 = await C.encode(real), c2 = await C.encode2(real);
+  assert(c2.startsWith('SARENTI2.') && /^\d+$/.test(c2.slice(9)));
+  assert.deepStrictEqual(await C.decode(c2), await C.decode(c1), 'v2 se lee igual que v1');
+  assert.deepStrictEqual((await C.decode(c2)).shop['Agua natural'], []);
+  assert.deepStrictEqual(await C.decode('Hola, tu plan:\n' + c2.slice(0, 50) + '\n' + c2.slice(50)), await C.decode(c1));
+  for (const bad of ['SARENTI2.', 'SARENTI2.1234', 'SARENTI2.' + c2.slice(9, 60)]) await assert.rejects(C.decode(bad));
+  const fits = (code, v2) => { for (const l of ['M', 'L']) { try { const q = qrcode(0, l); if (v2) { q.addData('SARENTI2.', 'Alphanumeric'); q.addData(code.slice(9), 'Numeric'); } else q.addData(code, 'Byte'); q.make(); return l + ' v' + q.getModuleCount(); } catch (e) {} } return null; };
+  console.log(`plan real con lista: v1 ${c1.length} chars QR ${fits(c1)} · v2 ${c2.length} chars QR ${fits(c2, true)}`);
+  assert(fits(c2, true), 'el v2 cabe en un QR');
+  // Bytes ↔ dígitos con todos los largos del último bloque.
+  for (let n = 0; n < 30; n++) { const t = 'x'.repeat(n) + 'ñ'; assert.strictEqual((await C.decode(await C.encode2({ ...plan(1), name: t }))).name, t); }
+  // Vector para la prueba de la app del paciente (test/codec_test.dart).
+  const vp = plan(0); vp.id = 't2'; vp.name = 'Lucía Torres'; vp.daily = []; vp.avoid = []; vp.prep = [];
+  vp.days[0] = [{ name: 'Desayuno', time: '08:00', items: ['# Molletes', '1 bolillo integral', 'Agua natural'] }];
+  vp.days.slice(1).forEach((d, i) => d.forEach(m => { m.items = []; }));
+  vp.shop = { '1 bolillo integral': ['1 bolillo'], 'Agua natural': [] };
+  console.log('vector v2: ' + await C.encode2(vp));
   console.log('codec OK');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -622,12 +622,18 @@
   }
 
   /* ---------- QR ---------- */
+  /* Un código v2 va en dos partes: el prefijo en modo alfanumérico y los dígitos en modo numérico. */
   function makeQR(text) {
-    var last;
+    var last, v2 = text.indexOf(SarentiCodec.PREFIX2) === 0;
     for (var lv of ['M', 'L']) {
-      try { var q = qrcode(0, lv); q.addData(text, 'Byte'); q.make(); return { q: q, level: lv }; } catch (e) { last = e; }
+      try {
+        var q = qrcode(0, lv);
+        if (v2) { q.addData(SarentiCodec.PREFIX2, 'Alphanumeric'); q.addData(text.slice(SarentiCodec.PREFIX2.length), 'Numeric'); }
+        else q.addData(text, 'Byte');
+        q.make(); return { q: q, level: lv };
+      } catch (e) { last = e; }
     }
-    throw new Error('El plan es demasiado largo para un QR. Acorta algunos textos.');
+    throw last;
   }
   /* QR en forma de corazón, como un mosaico de cuadritos color vino del logo.
      El QR real va en el centro y el resto del corazón
@@ -716,11 +722,20 @@
     var holder = el('div', { class: 'qrbox' }, [el('p', { class: 'muted', text: 'Generando…' })]);
     main.appendChild(holder);
     var fontReady = document.fonts ? document.fonts.load('700 20px "Cormorant Garamond"').catch(function () {}) : null;
-    Promise.all([SarentiCodec.encode(p), fontReady]).then(function (r) {
-      var code = r[0], res;
-      try { res = makeQR(code); } catch (e) { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: e.message })); return; }
+    /* Primero el código v1 (lo leen todas las versiones de la app); si no cabe en un QR, el v2, más compacto. */
+    function encodeQR() {
+      return SarentiCodec.encode(p).then(function (code) {
+        try { return [code, makeQR(code)]; } catch (e) {}
+        return SarentiCodec.encode2(p).then(function (code2) {
+          try { return [code2, makeQR(code2)]; } catch (e) { return [code, null]; }
+        });
+      });
+    }
+    Promise.all([encodeQR(), fontReady]).then(function (r) {
+      var code = r[0][0], res = r[0][1];
       show();
       function show() {
+        if (!res) { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: 'Este plan es demasiado largo para el corazón. Acorta algunos textos del plan.' })); return; }
         var wrap = el('div'); wrap.innerHTML = qrSvg(res.q, p.name || 'Paciente');
         /* Zoom: el QR a pantalla completa para que el paciente lo escanee del monitor o del celular. */
         function zoom() {
