@@ -433,7 +433,7 @@
   function norm(t) { return String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim(); }
   function aiPrompt(d) {
     var skel = '{\n' + AI_MEALS.map(function (m, i) {
-      return '  "' + m[0] + '": {\n' + AI_DAYS.map(function (n, j) { return '    "' + n + '": ""' + (j < 6 ? ',' : ''); }).join('\n') + '\n  }' + (i < 4 ? ',' : '');
+      return '  "' + m[0] + '": {\n' + AI_DAYS.map(function (n, j) { return '    "' + n + '": []' + (j < 6 ? ',' : ''); }).join('\n') + '\n  }' + (i < 4 ? ',' : '');
     }).join('\n') + '\n}';
     return 'Actúa como nutriólogo/a. Genera un plan de alimentación saludable y variado de 7 días:\n\n' +
       'La o el paciente tiene:\n\nEDAD: ' + d.edad + '\n\nPESO: ' + d.peso + '\n\nCondición: ' + d.cond +
@@ -441,12 +441,40 @@
       'Comidas (en este orden): DESAYUNO, COLACIÓN MAÑANERA, COMIDA, COLACIÓN VESPERTINA, CENA.\n' +
       'Días: LUNES, MARTES, MIÉRCOLES, JUEVES, VIERNES, SÁBADO, DOMINGO.\n\n' +
       'REGLAS DE FORMATO (muy importantes):\n' +
-      '- Responde ÚNICAMENTE con un objeto JSON válido. Sin texto antes ni después, sin explicaciones y sin ``` .\n' +
+      '- Responde ÚNICAMENTE con un objeto JSON válido, dentro de UN SOLO bloque de código ```json (para que se pueda copiar con el botón Copiar). Sin texto antes ni después del bloque y sin explicaciones.\n' +
+      '- Usa comillas rectas (") y no dejes comas sobrantes.\n' +
       '- Usa EXACTAMENTE las mismas llaves (en MAYÚSCULAS) que el esqueleto de abajo.\n' +
-      '- El valor de cada celda es un texto; escribe cada alimento o cantidad en su propia línea separada con \\n.\n' +
-      '- Si el platillo tiene nombre (ej. "Pasta boloñesa", "Ensalada César"), ponlo en la PRIMERA línea de la celda empezando con # (ej. "# Pasta boloñesa") y debajo los ingredientes o cantidades. Si no tiene nombre, deja solo los ingredientes.\n' +
-      '- Si una comida no aplica para algún día, deja la celda como cadena vacía "".\n\n' +
+      '- El valor de cada celda es una LISTA de textos, un alimento o cantidad por elemento. Ej. ["2 huevos revueltos", "1/3 de aguacate", "1 tortilla de maíz"].\n' +
+      '- Si el platillo tiene nombre (ej. "Pasta boloñesa", "Ensalada César"), ponlo como PRIMER elemento empezando con # (ej. ["# Pasta boloñesa", "80 g de pasta", "100 g de carne molida"]) y después los ingredientes o cantidades. Si no tiene nombre, pon solo los ingredientes.\n' +
+      '- Si una comida no aplica para algún día, deja la lista vacía [].\n\n' +
       'Esqueleto a llenar (rellena los valores manteniendo las llaves):\n' + skel;
+  }
+  /* Lee el JSON que pega la doctora aunque venga como lo copian ChatGPT, Gemini, etc.: con ```json, texto alrededor,
+     comillas “curvas”, espacios raros, saltos de línea dentro de los textos o comas sobrantes. */
+  function looseJSON(text, what) {
+    var t = String(text || '').replace(/[“”„‟″＂]/g, '"').replace(/[   ​﻿]/g, ' ');
+    var a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if (a < 0 || b < a) throw new Error('No encontré ' + what + ' en lo que pegaste. Copia la respuesta completa de la IA (con el botón Copiar del bloque de código).');
+    t = t.slice(a, b + 1);
+    try { return JSON.parse(t); } catch (e) {}
+    // Arreglos: saltos de línea y tabuladores dentro de los textos, comentarios // y comas antes de } o ].
+    var out = '', inStr = false;
+    for (var i = 0; i < t.length; i++) {
+      var ch = t[i];
+      if (inStr) {
+        if (ch === '\\') { out += ch + (t[i + 1] || ''); i++; continue; }
+        if (ch === '"') inStr = false;
+        out += ch === '\n' ? '\\n' : ch === '\r' ? '' : ch === '\t' ? ' ' : ch;
+      } else {
+        if (ch === '"') inStr = true;
+        else if (ch === '/' && t[i + 1] === '/') { while (i < t.length && t[i] !== '\n') i++; continue; }
+        out += ch;
+      }
+    }
+    out = out.replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(out); } catch (e) {
+      throw new Error('La respuesta está incompleta o tiene un error. Pide a la IA: "Escríbelo otra vez solo como JSON en un bloque de código" y cópialo con el botón Copiar.');
+    }
   }
   function aiMeal(key) {
     var k = norm(key);
@@ -458,9 +486,7 @@
   }
   /* Devuelve 7 días × 5 comidas con la lista de alimentos de cada una. Tolera texto alrededor y acentos distintos. */
   function parseAI(text) {
-    var a = text.indexOf('{'), b = text.lastIndexOf('}'), o, found = 0;
-    if (a < 0 || b < a) throw new Error('No encontré el plan en lo que pegaste. Copia la respuesta completa de la IA.');
-    try { o = JSON.parse(text.slice(a, b + 1)); } catch (e) { throw new Error('La respuesta está incompleta o tiene un error. Pide a la IA que la vuelva a escribir solo como JSON.'); }
+    var o = looseJSON(text, 'el plan'), found = 0;
     var days = AI_DAYS.map(function () { return [[], [], [], [], []]; }), dayKeys = AI_DAYS.map(norm);
     Object.keys(o || {}).forEach(function (mk) {
       var mi = aiMeal(mk), row = o[mk];
@@ -516,7 +542,7 @@
 
     main.appendChild(el('div', { class: 'sub', text: '3. Pegar la respuesta' }));
     main.appendChild(el('p', { class: 'hint', text: 'Copia la respuesta completa de la IA y pégala aquí. Se reemplazan las comidas de los 7 días; después puedes ajustarlas.' }));
-    var ta = el('textarea', { 'aria-label': 'Respuesta de la IA', placeholder: '{ "DESAYUNO": { "LUNES": "…" } … }', style: 'min-height:160px' });
+    var ta = el('textarea', { 'aria-label': 'Respuesta de la IA', placeholder: '{ "DESAYUNO": { "LUNES": ["…"] } … }', style: 'min-height:160px' });
     var msg = el('p', { class: 'err', role: 'alert' });
     main.appendChild(ta);
     main.appendChild(el('div', { class: 'row', style: 'margin-top:8px' }, [el('button', { class: 'btn primary', onclick: function () {
@@ -542,7 +568,8 @@
     return 'Eres asistente de una nutrióloga. Abajo están los renglones de un plan de alimentación de 7 días. ' +
       'Para cada renglón, dime qué hay que comprar en el súper, para armar la lista de compras.\n\n' +
       'REGLAS (muy importantes):\n' +
-      '- Responde ÚNICAMENTE con un objeto JSON válido. Sin texto antes ni después, sin explicaciones y sin ``` .\n' +
+      '- Responde ÚNICAMENTE con un objeto JSON válido, dentro de UN SOLO bloque de código ```json (para que se pueda copiar con el botón Copiar). Sin texto antes ni después del bloque y sin explicaciones.\n' +
+      '- Usa comillas rectas (") y no dejes comas sobrantes.\n' +
       '- Las llaves son EXACTAMENTE los renglones de abajo, copiados igual (mismos acentos, mayúsculas y signos). Incluye todos.\n' +
       '- El valor es una lista con un ingrediente por elemento. Ej. "Limón y chile en polvo": ["Limón", "Chile en polvo"].\n' +
       '- Usa SIEMPRE el mismo nombre para el mismo ingrediente en todo el plan, sencillo y en singular: "Limón" (no "jugo de limón", "limones" ni "limón amarillo").\n' +
@@ -555,9 +582,7 @@
       'Renglones:\n' + JSON.stringify(lines, null, 1);
   }
   function parseShopAI(text, lines) {
-    var a = text.indexOf('{'), b = text.lastIndexOf('}'), o;
-    if (a < 0 || b < a) throw new Error('No encontré la lista en lo que pegaste. Copia la respuesta completa de la IA.');
-    try { o = JSON.parse(text.slice(a, b + 1)); } catch (e) { throw new Error('La respuesta está incompleta o tiene un error. Pide a la IA que la vuelva a escribir solo como JSON.'); }
+    var o = looseJSON(text, 'la lista');
     var byNorm = {}, out = {}, found = 0;
     lines.forEach(function (t) { byNorm[norm(t)] = t; });
     Object.keys(o || {}).forEach(function (k) {
