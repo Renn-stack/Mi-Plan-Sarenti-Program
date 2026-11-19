@@ -324,7 +324,7 @@
   }
   /* Botones para agregar indicaciones comunes con un toque. Se ocultan las que ya están en la lista. */
   var SUGGEST = {
-    daily: ['Probiótico en ayunas', 'Colágeno en la mañana', '2 litros de agua', 'Caminar 30 minutos', 'Dormir de 7 a 8 horas', 'Multivitamínico con el desayuno'],
+    daily: ['Probiótico en ayunas', 'Colágeno en la mañana', 'Caminar 30 minutos', 'Dormir de 7 a 8 horas', 'Multivitamínico con el desayuno'],
     avoid: ['Refrescos y jugos industrializados', 'Pan dulce', 'Frituras', 'Alcohol', 'Comida rápida', 'Azúcar añadida', 'Embutidos'],
     prep: ['Hornear o asar, evitar freír', 'Pesar los alimentos en crudo', 'Cocinar con poco aceite', 'Usar aceite de oliva o de aguacate', 'Verduras al vapor', 'No agregar sal en la mesa']
   };
