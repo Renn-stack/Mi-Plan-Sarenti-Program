@@ -7,8 +7,11 @@ Herramienta web para crear planes de alimentación por paciente y generar el **c
 - Se guarda sola mientras se escribe.
 - Respaldo: botón "Respaldo" para descargar y cargar un archivo con todos los planes (sirve para cambiar de dispositivo).
 - Escanear: en "Nuevo plan" se puede escanear el QR de un plan (cámara o foto) o pegar su código para seguir editándolo. Si el plan ya está en el dispositivo, pregunta si reemplazarlo.
-- Llenar con IA: la pestaña "Llenar con IA" del plan arma las instrucciones con edad, peso, condición, alergias y objetivo (sin el nombre del paciente) para pegarlas en ChatGPT u otra IA. Al pegar su respuesta (JSON) se llenan los 7 días, que luego se pueden ajustar. Esos datos se guardan solo en el dispositivo y no van en el QR.
-- Plantillas: "Guardar como plantilla" y "Nuevo plan" desde plantilla. Hay un "Plan de ejemplo" con datos inventados.
+- El plan se arma en 5 pasos: 1. Datos e IA, 2. Comidas por día, 3. Indicaciones, 4. Lista de compras y 5. Compartir.
+- Llenar con IA (paso 1): con edad, peso, condición, alergias y objetivo (sin el nombre del paciente) se arman las instrucciones para pegarlas en el asistente de IA. Al pegar su respuesta (JSON) se llenan los 7 días, que luego se pueden ajustar. Esos datos se guardan solo en el dispositivo y no van en el QR.
+- Lista de compras (paso 4): la IA dice qué se compra de cada alimento; la herramienta lo agrupa por categoría y suma las cantidades repetidas.
+- Plantillas: "Guardar como plantilla" (menú "Más" de la ficha) y "Nuevo plan" desde plantilla. Hay un "Plan de ejemplo" con datos inventados.
+- El diseño sigue las maquetas de `sarenti-planes-rediseno/`.
 
 ## Usar
 

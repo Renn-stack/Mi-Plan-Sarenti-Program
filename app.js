@@ -1,9 +1,10 @@
-/* Planes Sarenti: herramienta privada de la doctora. Todo se guarda en este dispositivo. */
+/* Planes Sarenti: herramienta privada de la doctora. Todo se guarda en este dispositivo.
+   El diseño sigue sarenti-planes-rediseno/ (maquetas, tokens.json y LEEME-PARA-LA-IA.md). */
 (function () {
   'use strict';
   var K_PLANS = 'sarenti.plans.v1', K_TPL = 'sarenti.templates.v1', K_PIN = 'sarenti.pin.v1';
   var DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-  var DAY_L = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+  var DAY_S = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   var app = document.getElementById('app');
 
   /* ---------- almacenamiento ---------- */
@@ -31,9 +32,61 @@
   }
   function uid() { var a = new Uint8Array(6); (self.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach(function (_, i) { a[i] = Math.random() * 256; }); return Array.prototype.map.call(a, function (b) { return b.toString(36).padStart(2, '0'); }).join('').slice(0, 9); }
   function nowSec() { return Math.floor(Date.now() / 1000); }
-  function fmtDate(s) { if (!s) return ''; return new Date(s * 1000).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  function fmtDate(s) { if (!s) return ''; return new Date(s * 1000).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', ''); }
   function toast(msg) { var t = el('div', { class: 'toast', role: 'status', text: msg }); document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2600); }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function copyText(t, done, fail) {
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast(done); },
+      fail || function () { toast('Este navegador no dejó copiar. Selecciona el texto y cópialo.'); });
+  }
+
+  /* Íconos de línea (trazo 1.8), los mismos de las maquetas. Sin emojis. */
+  var ICONS = {
+    monitor: [1.8, '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'],
+    download: [1.8, '<path d="M12 3v12M7 10l5 5 5-5M4 19h16"/>'],
+    lock: [1.8, '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'],
+    sidebar: [1.8, '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M14 10l2 2-2 2"/>'],
+    sidebarOff: [1.8, '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M16 10l-2 2 2 2"/>'],
+    plus: [2, '<path d="M12 5v14M5 12h14"/>'],
+    right: [2, '<path d="M5 12h14M13 6l6 6-6 6"/>'],
+    left: [2, '<path d="M19 12H5M11 6l-6 6 6 6"/>'],
+    check: [2.4, '<path d="M5 12l5 5 9-10"/>'],
+    dots: [0, '<circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/>'],
+    spark: [1.8, '<path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4zM19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/>'],
+    copy: [1.8, '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>'],
+    info: [1.8, '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>'],
+    trash: [1.8, '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'],
+    x: [2, '<path d="M6 6l12 12M18 6L6 18"/>'],
+    drop: [1.8, '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>'],
+    cal: [1.8, '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/>'],
+    ban: [1.8, '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>'],
+    pot: [1.8, '<path d="M4 11h16a8 8 0 0 1-16 0zM8 7c0-1 1-2 1-3M12 7c0-1 1-2 1-3M16 7c0-1 1-2 1-3"/>'],
+    expand: [1.8, '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'],
+    heart: [1.8, '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'],
+    print: [1.8, '<path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/>'],
+    search: [1.8, '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'],
+    chev: [2, '<path d="M9 6l6 6-6 6"/>'],
+    alert: [1.8, '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 17.5A2 2 0 0 0 4.2 20.5h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'],
+    file: [1.8, '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15h6"/>'],
+    clock: [1.8, '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+    upload: [1.8, '<path d="M12 21V9M7 14l5-5 5 5M4 5h16"/>']
+  };
+  function icon(n, size) {
+    var d = ICONS[n], s = size || 18, t = document.createElement('span');
+    t.innerHTML = '<svg aria-hidden="true" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" ' +
+      (d[0] ? 'fill="none" stroke="currentColor" stroke-width="' + d[0] + '" stroke-linecap="round" stroke-linejoin="round"' : 'fill="currentColor"') + '>' + d[1] + '</svg>';
+    return t.firstChild;
+  }
+  /* Iniciales: primer nombre y primer apellido ("Renata Alexanders Ponce Paredes" → RP). */
+  function initials(n) {
+    var w = String(n || '').trim().split(/\s+/).filter(Boolean);
+    if (!w.length) return '?';
+    var b = w.length >= 4 ? w[2] : w.length > 1 ? w[1] : '';
+    return (w[0][0] + (b ? b[0] : (w[0][1] || ''))).toUpperCase();
+  }
+  function lowerFirst(s) { return s ? s[0].toLowerCase() + s.slice(1) : s; }
+  function numOnly(v) { var m = /^\s*(\d+(?:[.,]\d+)?)\s*(años?|kg|kilos?)?\.?\s*$/i.exec(v || ''); return m ? m[1] : (v || ''); }
+  function withUnit(v, u) { v = String(v || '').trim(); return /^\d+([.,]\d+)?$/.test(v) ? v + ' ' + u : v; }
 
   function emptyMeals() {
     return [['Desayuno', '08:00'], ['Colación', '11:00'], ['Comida', '14:00'], ['Colación', '17:00'], ['Cena', '20:00']].map(function (m) { return { name: m[0], time: m[1], items: [] }; });
@@ -58,7 +111,10 @@
 
   /* ---------- estado ---------- */
   var plans = [], templates = [];
-  var S = { sel: null, view: 'none', day: 0, tab: 'dias', search: '' };
+  /* view: home | new | backup | plan. En un plan, step 1 a 5; el paso 1 tiene dos partes (datos | ia). */
+  var S = { sel: null, view: 'home', step: 1, part: 'datos', day: 0, search: '', side: false };
+  function resetUI() { S.side = false; S.copyOpen = false; S.timeEdit = -1; S.paste = false; S.showPrompt = false; S.msg = null; S.editMsg = false; S.shopView = 'cat'; S.shopMore = {}; }
+  resetUI();
   var saveTimer = null, saved = true;
 
   function loadAll() {
@@ -81,14 +137,20 @@
   }
   function persist() {
     var ok = lsSet(K_PLANS, plans) && lsSet(K_TPL, templates);
-    saved = true; setStatus(ok ? 'Guardado' : 'No se pudo guardar en este navegador. Descarga un respaldo.');
+    saved = true; setStatus(ok ? 'Guardado' : 'No se pudo guardar. Descarga un respaldo.');
   }
   function touch() {
     var p = cur(); if (p) p.updated = nowSec();
     saved = false; setStatus('Guardando…');
     clearTimeout(saveTimer); saveTimer = setTimeout(persist, 300);
   }
-  function setStatus(t) { var s = document.getElementById('status'); if (s) s.textContent = t; }
+  function softSave() { clearTimeout(saveTimer); saveTimer = setTimeout(persist, 300); }   // sin cambiar la fecha del plan
+  /* "Guardado" en verde dentro de la ficha del paciente: no hay botón de guardar. */
+  function setStatus(t) {
+    var s = document.getElementById('status'); if (!s) return;
+    s.lastChild.textContent = t;
+    s.className = 'saved' + (t === 'Guardado' ? '' : t === 'Guardando…' ? ' busy' : ' bad');
+  }
   function cur() { for (var i = 0; i < plans.length; i++) if (plans[i].id === S.sel) return plans[i]; return null; }
 
   /* ---------- PIN ---------- */
@@ -106,7 +168,7 @@
     clearTimeout(idleTimer);
     if (unlocked) idleTimer = setTimeout(lock, 10 * 60 * 1000);
   }
-  function lock() { unlocked = false; S.sel = null; S.view = 'none'; render(); }
+  function lock() { unlocked = false; S.sel = null; S.view = 'home'; render(); }
   ['pointerdown', 'keydown'].forEach(function (ev) { document.addEventListener(ev, resetIdle, true); });
 
   function renderLock() {
@@ -126,99 +188,159 @@
       }
       unlocked = true; resetIdle(); loadAll(); render();
     }
-    var forgot = first ? null : el('button', { class: 'btn small', type: 'button', text: 'Olvidé mi PIN', onclick: function () {
+    var forgot = first ? null : el('button', { class: 'link', type: 'button', text: 'Olvidé mi PIN', onclick: function () {
       if (confirm('Para entrar de nuevo se borrarán todos los planes de este dispositivo. Si tienes un respaldo podrás importarlo después. ¿Continuar?')) {
         lsDel(K_PLANS); lsDel(K_TPL); lsDel(K_PIN); plans = []; templates = []; render();
       }
     } });
-    app.replaceChildren(el('main', { class: 'lock' }, [
-      el('img', { src: 'img/logo.png', alt: 'Sarenti Medicina estética' }),
-      el('h1', { text: 'Planes Sarenti' }),
+    app.replaceChildren(el('main', { class: 'lock' }, [el('div', { class: 'card' }, [
+      el('img', { src: 'img/logo.png', alt: 'Sarenti, medicina estética' }),
+      el('span', { class: 'eb', text: 'Sarenti' }),
+      el('h1', { text: 'Planes de alimentación' }),
       el('p', { class: 'muted', text: first ? 'Elige un PIN para proteger esta herramienta. Se guarda solo en este dispositivo.' : 'Escribe tu PIN para entrar.' }),
-      el('form', { onsubmit: go }, [pin, pin2, msg, el('button', { class: 'btn primary', type: 'submit', text: first ? 'Crear PIN y entrar' : 'Entrar' })]),
-      el('p', null, [forgot])
-    ]));
+      el('form', { onsubmit: go }, [pin, pin2, msg, el('button', { class: 'btn primary', type: 'submit', style: 'min-height:48px;font-size:16px;font-weight:600', text: first ? 'Crear PIN y entrar' : 'Entrar' })]),
+      forgot
+    ])]));
     pin.focus();
   }
 
   /* ---------- armazón ---------- */
   function render() {
     stopScan();
-    if (!unlocked) { document.body.classList.remove('has-sel'); return renderLock(); }
-    document.body.classList.toggle('has-sel', S.view !== 'none');
-    var side = el('nav', { class: 'side', 'aria-label': 'Pacientes' });
+    if (!unlocked) return renderLock();
+    var p = S.view === 'plan' ? cur() : null;
+    if (S.view === 'plan' && !p) S.view = 'home';
     var main = el('main', { class: 'main', id: 'main' });
-    buildSide(side); buildMain(main);
-    app.replaceChildren(
-      el('header', { class: 'top noprint' }, [
+    /* En Inicio la barra de pacientes se ve completa; en el plan empieza como riel angosto. */
+    var side = S.view !== 'plan' || S.side ? buildPanel() : buildRail(p);
+    if (S.view === 'home') buildHome(main);
+    else if (S.view === 'new') buildNew(main);
+    else if (S.view === 'backup') buildBackup(main);
+    else buildPlan(main, p);
+    app.replaceChildren(header(), el('div', { class: 'wrap' }, [side, main]));
+  }
+  function go(view) { S.view = view; if (view !== 'plan') S.sel = null; render(); focusMain(); }
+  function focusMain() { var m = document.getElementById('main'); if (m) { m.setAttribute('tabindex', '-1'); m.focus({ preventScroll: true }); window.scrollTo(0, 0); } }
+
+  function header() {
+    return el('header', { class: 'hd' }, [el('div', { class: 'hdi' }, [
+      el('button', { class: 'brand', type: 'button', 'aria-label': 'Planes de alimentación: ir al inicio', onclick: function () { go('home'); } }, [
         el('img', { src: 'img/logo.png', alt: '' }),
-        el('div', null, [el('div', { class: 'brand', text: 'Sarenti' }), el('h1', { text: 'Planes de alimentación' })]),
-        el('span', { class: 'spacer' }),
-        el('button', { class: 'btn small', onclick: lock, text: 'Bloquear' })
+        el('span', { class: 't' }, [el('span', { class: 'eb', text: 'Sarenti' }), el('span', { class: 'serif', text: 'Planes de alimentación' })])
       ]),
-      el('div', { class: 'layout' }, [side, main])
-    );
+      el('div', { class: 'acts' }, [
+        el('span', { class: 'chip' }, [icon('monitor', 16), 'Guardado solo en este dispositivo']),
+        el('button', { class: 'btn', type: 'button', onclick: function () { go('backup'); } }, [icon('download'), 'Respaldo']),
+        el('button', { class: 'btn', type: 'button', onclick: lock }, [icon('lock'), 'Bloquear'])
+      ])
+    ])]);
   }
 
-  function buildSide(side) {
-    var list = el('div', { id: 'plist' });
-    var search = el('input', { type: 'search', 'aria-label': 'Buscar paciente', placeholder: 'Buscar paciente', value: S.search, oninput: function (e) { S.search = e.target.value; fillList(list); } });
-    side.appendChild(el('div', { class: 'row', style: 'margin-bottom:12px' }, [
-      el('button', { class: 'btn primary', onclick: function () { S.view = 'new'; S.sel = null; render(); focusMain(); }, text: '+ Nuevo plan' }),
-      el('button', { class: 'btn small', onclick: function () { S.view = 'backup'; S.sel = null; render(); focusMain(); }, text: 'Respaldo' })
-    ]));
-    side.appendChild(el('div', { style: 'margin-bottom:12px' }, [search]));
-    side.appendChild(list); fillList(list);
+  /* ---------- barra lateral ---------- */
+  function buildPanel() {
+    var list = el('div', { class: 'plist', id: 'plist' }), n = plans.length;
+    var panel = el('aside', { class: 'panel card', 'aria-label': 'Pacientes' }, [
+      el('div', { class: 'side-h' }, [
+        el('h2', { text: 'Pacientes' }),
+        el('span', { class: 'row', style: 'gap:6px' }, [
+          el('span', { class: 'chip', text: n + (n === 1 ? ' paciente' : ' pacientes') }),
+          S.view === 'plan' ? el('button', { class: 'ib', type: 'button', 'aria-label': 'Ocultar barra lateral', title: 'Ocultar barra lateral', 'aria-expanded': 'true', onclick: function () { S.side = false; render(); } }, [icon('sidebarOff', 20)]) : null
+        ])
+      ]),
+      el('button', { class: 'big-new', type: 'button', onclick: function () { go('new'); } }, [icon('plus', 20), 'Nuevo plan']),
+      el('div', { class: 'fld', style: 'gap:8px' }, [
+        el('label', { for: 'buscar', class: 'lbl', text: 'Buscar paciente' }),
+        el('div', { class: 'search' }, [icon('search'), el('input', { id: 'buscar', type: 'search', placeholder: 'Nombre o apellido', value: S.search, autocomplete: 'off', oninput: function (e) { S.search = e.target.value; fillList(list); } })])
+      ]),
+      el('div', { class: 'fld', style: 'gap:8px' }, [el('span', { class: 'cap', text: 'Recientes' }), list]),
+      el('div', { class: 'tip' }, [icon('alert'), el('span', { text: 'Como los planes viven solo en este equipo, descarga un respaldo cada semana para no perderlos.' })])
+    ]);
+    fillList(list);
+    return panel;
   }
   function fillList(list) {
-    var q = S.search.trim().toLowerCase();
-    var items = plans.filter(function (p) { return !q || p.name.toLowerCase().indexOf(q) >= 0; }).sort(function (a, b) { return b.updated - a.updated; });
+    var q = norm(S.search);
+    var items = plans.filter(function (p) { return !q || norm(p.name).indexOf(q) >= 0; }).sort(function (a, b) { return b.updated - a.updated; });
     list.replaceChildren();
-    if (!items.length) list.appendChild(el('p', { class: 'muted', text: plans.length ? 'No hay coincidencias.' : 'Aún no hay planes. Crea el primero con “+ Nuevo plan”.' }));
+    if (!items.length) list.appendChild(el('p', { class: 'hint', text: plans.length ? 'No hay coincidencias.' : 'Aún no hay planes. Crea el primero con “Nuevo plan”.' }));
     items.forEach(function (p) {
-      list.appendChild(el('div', { class: 'plan-item' + (p.id === S.sel ? ' sel' : '') }, [
-        el('button', { class: 'open', 'aria-current': p.id === S.sel ? 'true' : null, onclick: function () { S.sel = p.id; S.view = 'edit'; S.day = 0; S.tab = 'ia'; render(); focusMain(); } }, [
-          el('span', { class: 'nm', text: p.name || 'Sin nombre' }),
-          el('span', { class: 'dt', text: 'Actualizado ' + fmtDate(p.updated) })
-        ])
+      list.appendChild(el('button', { class: 'pitem', type: 'button', 'aria-current': p.id === S.sel ? 'true' : null, onclick: function () { openPlan(p); } }, [
+        el('span', { class: 'av', 'aria-hidden': 'true', text: initials(p.name) }),
+        el('span', { class: 'tx' }, [el('span', { class: 'nm', text: p.name || 'Sin nombre' }), el('span', { class: 'dt', text: 'Actualizado ' + fmtDate(p.updated) })]),
+        icon('chev')
       ]));
     });
   }
-  function focusMain() { var m = document.getElementById('main'); if (m) { m.setAttribute('tabindex', '-1'); m.focus({ preventScroll: true }); window.scrollTo(0, 0); } }
-  function backBtn() { return el('button', { class: 'btn small only-narrow noprint', style: 'margin:8px 0', onclick: function () { S.view = 'none'; S.sel = null; render(); }, text: '← Pacientes' }); }
+  function buildRail(p) {
+    return el('nav', { class: 'rail', 'aria-label': 'Barra lateral' }, [
+      el('button', { class: 'ib2', type: 'button', 'aria-label': 'Mostrar barra lateral', title: 'Mostrar barra lateral', 'aria-expanded': 'false', onclick: function () { S.side = true; render(); } }, [icon('sidebar', 20)]),
+      el('button', { class: 'ib2 primary', type: 'button', 'aria-label': 'Nuevo plan', title: 'Nuevo plan', onclick: function () { go('new'); } }, [icon('plus', 20)]),
+      el('span', { class: 'sep', 'aria-hidden': 'true' }),
+      el('button', { class: 'av', type: 'button', 'aria-label': 'Datos de ' + (p.name || 'este paciente'), title: p.name || 'Sin nombre', text: initials(p.name),
+        onclick: function () { S.step = 1; S.part = 'datos'; render(); focusMain(); } })
+    ]);
+  }
+  function hasMeals(p) { return p.days.some(function (d) { return d.some(function (m) { return m.items.some(function (t) { t = String(t).trim(); return t && !isDish(t); }); }); }); }
+  function partOneDone(p) { return !!(p.ai && p.ai.ok) || hasMeals(p); }
+  function openPlan(p) {
+    S.sel = p.id; S.view = 'plan'; S.day = 0; resetUI();
+    S.step = hasMeals(p) ? 2 : 1; S.part = partOneDone(p) ? 'ia' : 'datos';
+    render(); focusMain();
+  }
 
-  function buildMain(main) {
-    if (S.view === 'none') { main.appendChild(el('div', { class: 'card', style: 'margin-top:16px' }, [el('h2', { text: 'Bienvenida' }), el('p', { class: 'muted', text: 'Elige a un paciente de la lista o crea un plan nuevo. Todo se guarda solo en este dispositivo.' })])); return; }
-    main.appendChild(backBtn());
-    if (S.view === 'new') return buildNew(main);
-    if (S.view === 'backup') return buildBackup(main);
-    var p = cur(); if (!p) { S.view = 'none'; return; }
-    if (S.view === 'qr') return buildQR(main, p);
-    buildEditor(main, p);
+  /* ---------- inicio ---------- */
+  function tile(ic, title, desc, fn, primary) {
+    return el('button', { class: 'tile' + (primary ? ' primary' : ''), type: 'button', onclick: fn }, [
+      el('span', { class: 'ic', 'aria-hidden': 'true' }, [icon(ic, 22)]), el('span', { class: 'tt', text: title }), el('span', { class: 'ds', text: desc })]);
+  }
+  function hero(eb, title, text) {
+    return el('div', { class: 'card hero' }, [el('span', { class: 'eb', text: eb }), el('h1', { text: title }), text ? el('p', { text: text }) : null]);
+  }
+  function buildHome(main) {
+    var last = plans.slice().sort(function (a, b) { return b.updated - a.updated; })[0];
+    main.append(
+      hero('Inicio', 'Bienvenida', '¿Qué quieres hacer hoy? Elige a un paciente de la lista o empieza un plan nuevo.'),
+      el('div', { class: 'tiles' }, [
+        tile('file', 'Crear plan nuevo', 'Registra a un paciente y arma su plan de 7 días.', function () { go('new'); }, true),
+        last ? tile('clock', 'Continuar el último', (last.name || 'Sin nombre') + ' · ' + fmtDate(last.updated), function () { openPlan(last); }) : null,
+        tile('download', 'Hacer respaldo', 'Descarga una copia de todos los planes.', downloadBackup)
+      ]),
+      el('section', { class: 'card stack', style: 'padding:28px 32px' }, [
+        el('h2', { text: 'Cómo funciona', style: 'font-size:24px' }),
+        el('div', { class: 'how' }, [['Registra al paciente', 'Nombre y datos básicos.'], ['Arma su plan', 'Comidas día por día.'], ['Actualízalo', 'Ajusta el plan en cada consulta.']].map(function (h, i) {
+          return el('div', null, [el('span', { class: 'n32', text: String(i + 1) }), el('span', null, [el('strong', { text: h[0] }), el('br'), h[1]])]);
+        }))
+      ])
+    );
   }
 
   /* ---------- nuevo plan ---------- */
-  function addPlan(p) { plans.push(p); S.sel = p.id; S.view = 'edit'; S.day = 0; S.tab = 'ia'; persist(); render(); focusMain(); }   // todo plan abre en Llenar con IA
+  function addPlan(p, step) {
+    plans.push(p); S.sel = p.id; S.view = 'plan'; S.day = 0; resetUI();
+    S.step = step || 1; S.part = step ? 'ia' : 'datos';
+    persist(); render(); focusMain();
+  }
   function buildNew(main) {
-    main.appendChild(el('h2', { text: 'Nuevo plan', style: 'margin:12px 0' }));
-    var name = el('input', { type: 'text', id: 'nn', placeholder: 'Nombre del paciente', autocomplete: 'off' });
-    main.appendChild(el('div', { class: 'field' }, [el('label', { for: 'nn', text: 'Nombre del paciente' }), name]));
-    function make(base) { var p = base ? clone(base) : blankPlan(); p.id = uid(); p.name = name.value.trim() || (base && base.name) || 'Paciente nuevo'; p.updated = nowSec(); addPlan(p); }
-    main.appendChild(el('p', { class: 'lbl', text: 'Empezar con:' }));
-    var row = el('div', { class: 'row' }, [
-      el('button', { class: 'btn primary', onclick: function () { make(null); }, text: 'Plan vacío' }),
-      el('button', { class: 'btn', onclick: function () { make(samplePlan()); }, text: 'Plan de ejemplo' })
-    ]);
-    main.appendChild(row);
+    function make(base) {
+      var p = base ? clone(base) : blankPlan();
+      p.id = uid(); p.name = base && base.tplName ? '' : (p.name || ''); delete p.tplName; p.updated = nowSec();
+      addPlan(p);
+    }
+    main.append(
+      hero('Nuevo plan', '¿Cómo quieres empezar?', 'Después capturas los datos del paciente y llenas los 7 días con IA.'),
+      el('div', { class: 'tiles' }, [
+        tile('file', 'Plan en blanco', 'Empieza desde cero con los datos del paciente.', function () { make(null); }, true),
+        tile('spark', 'Plan de ejemplo', 'Con datos inventados, para practicar.', function () { make(samplePlan()); })
+      ])
+    );
     if (templates.length) {
-      main.appendChild(el('div', { class: 'sub', text: 'Mis plantillas' }));
+      var box = el('section', { class: 'card stack', style: 'gap:8px' }, [el('div', { class: 'head-t', style: 'margin-bottom:8px' }, [el('h2', { text: 'Mis plantillas' }), el('p', { class: 'muted', style: 'font-size:15px', text: 'Planes guardados sin datos del paciente.' })])]);
       templates.forEach(function (t, i) {
-        main.appendChild(el('div', { class: 'card row' }, [
-          el('strong', { text: t.tplName }), el('span', { class: 'spacer' }),
-          el('button', { class: 'btn small primary', onclick: function () { make(t); }, text: 'Usar' }),
-          el('button', { class: 'btn small danger', onclick: function () { if (confirm('¿Borrar la plantilla “' + t.tplName + '”?')) { templates.splice(i, 1); persist(); render(); } }, text: 'Borrar' })
-        ]));
+        box.appendChild(el('div', { class: 'tpl' }, [el('strong', { text: t.tplName }),
+          el('button', { class: 'btn small primary', type: 'button', onclick: function () { make(t); }, text: 'Usar' }),
+          el('button', { class: 'btn small danger', type: 'button', 'aria-label': 'Borrar la plantilla ' + t.tplName, onclick: function () { if (confirm('¿Borrar la plantilla “' + t.tplName + '”?')) { templates.splice(i, 1); persist(); render(); } }, text: 'Borrar' })]));
       });
+      main.appendChild(box);
     }
     var msg = el('p', { class: 'err', role: 'alert' });
     /* Si el plan ya está en este dispositivo, se puede reemplazar con la versión del código. */
@@ -230,19 +352,17 @@
           if (confirm('Ya tienes el plan de ' + (ex.name || 'este paciente') + '. ¿Reemplazarlo con el del código?\n\nAceptar: reemplazar. Cancelar: guardarlo como copia.')) plans.splice(plans.indexOf(ex), 1);
           else p.id = uid();
         }
-        addPlan(p);
+        addPlan(p, 2);
       } catch (e) { msg.textContent = e.message; }
     }
-    main.appendChild(el('div', { class: 'sub', text: 'O escanear un QR' }));
-    main.appendChild(el('p', { class: 'hint', text: 'Para editar un plan que ya tiene QR (por ejemplo, hecho en otro dispositivo).' }));
-    main.appendChild(scanner(loadCode));
-    main.appendChild(el('div', { class: 'sub', text: 'O pegar un código' }));
-    main.appendChild(el('p', { class: 'hint', text: 'El mensaje de WhatsApp completo o solo el código que empieza con SARENTI1.' }));
-    var ta = el('textarea', { 'aria-label': 'Código del plan', placeholder: 'SARENTI1.…' });
-    main.appendChild(ta);
-    main.appendChild(el('div', { class: 'row', style: 'margin-top:8px' }, [el('button', { class: 'btn', onclick: function () { loadCode(ta.value); }, text: 'Cargar código' })]));
-    main.appendChild(msg);
-    name.focus();
+    var ta = el('textarea', { id: 'code-in', class: 'paste', rows: '3', placeholder: 'SARENTI1.…' });
+    main.appendChild(el('section', { class: 'card stack' }, [
+      el('div', { class: 'head-t' }, [el('h2', { text: 'Abrir un plan que ya tiene QR' }), el('p', { class: 'muted', style: 'font-size:15px', text: 'Por ejemplo, uno hecho en otro dispositivo. Escanea el corazón o pega su código.' })]),
+      scanner(loadCode),
+      el('div', { class: 'fld' }, [el('label', { for: 'code-in', class: 'lbl', text: 'O pega el código: el mensaje de WhatsApp completo o solo lo que empieza con SARENTI' }), ta]),
+      el('div', { class: 'row' }, [el('button', { class: 'btn', type: 'button', onclick: function () { loadCode(ta.value); }, text: 'Cargar código' })]),
+      msg
+    ]));
   }
 
   /* ---------- escanear QR ---------- */
@@ -300,127 +420,338 @@
     return box;
   }
 
-  /* ---------- editor ---------- */
-  /* Un renglón que empieza con "# " es el nombre del platillo: la app lo muestra como título, sin casilla. */
+  /* ---------- plan del paciente ---------- */
+  var STEPS = ['Datos e IA', 'Comidas por día', 'Indicaciones', 'Lista de compras', 'Compartir'];
+  var STEPS_S = ['Datos e IA', 'Comidas', 'Indicaciones', 'Lista de compras', 'Compartir'];
+  function buildPlan(main, p) {
+    /* La ficha del paciente no aparece mientras se capturan sus datos (parte 1). */
+    if (!(S.step === 1 && S.part === 'datos')) main.appendChild(patientCard(p));
+    main.appendChild(stepsNav(p));
+    [null, step1, step2, step3, step4, step5][S.step](main, p);
+  }
+  function goStep(p, k) {
+    if (k === 5) return goQR(p);
+    S.step = k; S.copyOpen = false; S.paste = false; S.timeEdit = -1;
+    if (k === 1) S.part = partOneDone(p) ? 'ia' : 'datos';
+    render(); focusMain();
+  }
+  function patientCard(p) {
+    var d = p.ai || {}, chips = [];
+    if (String(d.edad || '').trim()) chips.push(withUnit(d.edad, 'años'));
+    if (String(d.peso || '').trim()) chips.push(withUnit(d.peso, 'kg'));
+    if (String(d.objetivo || '').trim()) chips.push('Objetivo: ' + lowerFirst(d.objetivo.trim()));
+    /* Duplicar, Guardar como plantilla y Eliminar van solo dentro de "Más". */
+    var more = el('details', { class: 'more' }, [
+      el('summary', { class: 'btn', 'aria-label': 'Más opciones: duplicar, guardar como plantilla o eliminar' }, [icon('dots'), 'Más']),
+      el('div', { class: 'menu' }, [
+        el('button', { type: 'button', onclick: function () { duplicatePlan(p); } }, [icon('copy'), 'Duplicar']),
+        el('button', { type: 'button', onclick: function () { more.open = false; saveTemplate(p); } }, [icon('file'), 'Guardar como plantilla']),
+        el('button', { type: 'button', class: 'danger', onclick: function () { more.open = false; removePlan(p); } }, [icon('trash'), 'Eliminar'])
+      ])
+    ]);
+    return el('section', { class: 'card pcard', 'aria-label': 'Paciente' }, [
+      el('div', { class: 'who' }, [
+        el('span', { class: 'av', 'aria-hidden': 'true', text: initials(p.name) }),
+        el('div', { style: 'min-width:0' }, [el('h1', { text: p.name || 'Sin nombre' }), chips.length ? el('div', { class: 'chips' }, chips.map(function (c) { return el('span', { class: 'chip', text: c }); })) : null])
+      ]),
+      el('div', { class: 'acts noprint' }, [
+        el('span', { class: 'saved' + (saved ? '' : ' busy'), id: 'status', role: 'status', 'aria-live': 'polite' }, [icon('check', 16), el('span', { text: saved ? 'Guardado' : 'Guardando…' })]),
+        more
+      ])
+    ]);
+  }
+  function duplicatePlan(p) {
+    var c = clone(p); c.id = uid(); c.name = p.name + ' (copia)'; c.updated = nowSec();
+    plans.push(c); S.sel = c.id; persist(); render(); toast('Plan duplicado');
+  }
+  function saveTemplate(p) {
+    var n = prompt('Nombre de la plantilla (sin datos del paciente):', ''); if (!n || !n.trim()) return;
+    var c = clone(p); c.tplName = n.trim(); c.name = ''; delete c.ai; delete c.shopDone;
+    templates.push(c); persist(); toast('Plantilla guardada');
+  }
+  function removePlan(p) {
+    if (!confirm('¿Eliminar el plan de ' + (p.name || 'este paciente') + '? No se puede deshacer.')) return;
+    plans = plans.filter(function (x) { return x !== p; }); persist(); go('home');
+  }
+  /* Línea del tiempo: anteriores rellenos con palomita, el actual con anillo y halo, los siguientes en gris. */
+  function stepsNav(p) {
+    return el('nav', { class: 'card steps noprint', 'aria-label': 'Pasos del plan' }, [el('ol', { class: 'st' }, STEPS.map(function (n, i) {
+      var k = i + 1;
+      return el('li', { class: k < S.step ? 'done' : k === S.step ? 'cur' : null }, [
+        el('button', { type: 'button', 'aria-current': k === S.step ? 'step' : null, onclick: function () { goStep(p, k); } }, [
+          el('span', { class: 'dot' }, [k < S.step ? icon('check', 20) : String(k)]), n])
+      ]);
+    }))]);
+  }
+  /* Cada paso termina con "anterior" y "Siguiente". */
+  function bottomNav(p, prev, next, o) {
+    o = o || {};
+    return el('div', { class: 'stepnav noprint' }, [
+      prev ? el('button', { class: 'btn', type: 'button', onclick: function () { goStep(p, prev); } }, [icon('left'), STEPS_S[prev - 1]]) : null,
+      next ? el('button', { class: 'btn' + (o.plain ? '' : ' primary'), type: 'button', style: 'margin-left:auto', disabled: !!o.disabled, onclick: function () { goStep(p, next); } }, ['Siguiente: ' + STEPS[next - 1], icon('right')]) : null
+    ]);
+  }
+  function vstep(n, title, desc, kids, last, labelFor) {
+    return el('li', null, [
+      el('div', { class: 'rl' }, [el('span', { class: 'n36' + (last ? ' o' : ''), text: String(n) }), last ? null : el('i', { 'aria-hidden': 'true' })]),
+      el('div', { class: 'bd' }, [el('div', { class: 'head-t', style: 'gap:2px' }, [
+        el(labelFor ? 'label' : 'span', { class: 'tt', for: labelFor || null, text: title }), el('span', { class: 'muted', style: 'font-size:15px', text: desc })])].concat(kids))
+    ]);
+  }
+  function titleIc(ic, title, sub) {
+    return el('div', { class: 'title-ic' }, [el('span', { class: 'ic', 'aria-hidden': 'true' }, [icon(ic, 22)]),
+      el('div', { class: 'head-t', style: 'gap:2px' }, [el('h2', { text: title }), el('p', { class: 'muted', style: 'font-size:15px', text: sub })])]);
+  }
+
+  /* ---------- paso 1: datos e IA ---------- */
+  function isNone(v) { v = norm(v || ''); return !v || /^(NINGUN[OA]?S?|NO|NADA|N\/A|SIN|NA)$/.test(v); }
+  function step1(main, p) {
+    var d = p.ai || (p.ai = {});
+    AI_FIELDS.forEach(function (f) { if (typeof d[f[0]] !== 'string') d[f[0]] = ''; });
+    if (S.part === 'datos') step1Data(main, p, d); else step1AI(main, p, d);
+  }
+  function step1Data(main, p, d) {
+    var msg = el('p', { class: 'err', role: 'alert' });
+    function fld(id, label, key, o, cls) {
+      o = o || {};
+      var val = key === 'name' ? p.name : d[key];
+      var i = el('input', { id: id, class: 'in', type: 'text', value: o.unit ? numOnly(val) : val, placeholder: o.ph || null, inputmode: o.mode || null, autocomplete: 'off',
+        oninput: function (e) { if (key === 'name') p.name = e.target.value; else d[key] = e.target.value; touch(); } });
+      return el('div', { class: 'fld' + (cls ? ' ' + cls : '') }, [el('label', { for: id, class: 'lbl', text: label }),
+        o.unit ? el('div', { class: 'suf' }, [i, el('span', { 'aria-hidden': 'true', text: o.unit })]) : i]);
+    }
+    main.appendChild(el('section', { class: 'card focus stack' }, [
+      el('div', { class: 'head-t' }, [el('span', { class: 'eb', text: 'Parte 1 de 2' }), el('h2', { text: 'Datos del paciente' }),
+        el('p', { class: 'muted', style: 'font-size:15px', text: 'La IA los usa para armar el plan. El nombre no se le manda.' })]),
+      fld('f-nom', 'Nombre completo', 'name', { ph: 'Ej. Lucía Torres Ramírez' }),
+      el('div', { class: 'grid-a' }, [
+        fld('f-edad', 'Edad', 'edad', { unit: 'años', mode: 'numeric', ph: 'Ej. 34' }),
+        fld('f-peso', 'Peso', 'peso', { unit: 'kg', mode: 'decimal', ph: 'Ej. 72' }),
+        fld('f-obj', 'Objetivo', 'objetivo', { ph: 'Ej. bajar 5 kg de grasa' }, 'span2')
+      ]),
+      el('div', { class: 'grid-b' }, [
+        fld('f-cond', 'Condición o síntomas', 'cond', { ph: 'Ej. resistencia a la insulina' }),
+        fld('f-nog', 'No le gusta', 'nogusta', { ph: 'Ninguno' }),
+        fld('f-ale', 'Alergias', 'alergia', { ph: 'Ninguna' })
+      ]),
+      el('div', { class: 'foot' }, [msg, el('span', { class: 'hint', text: 'Revisa que estén completos antes de seguir.' }),
+        el('button', { class: 'btn primary', type: 'button', style: 'min-height:48px;font-size:16px;font-weight:600', onclick: function () {
+          if (!p.name.trim()) { msg.textContent = 'Escribe el nombre del paciente.'; document.getElementById('f-nom').focus(); return; }
+          p.name = p.name.trim(); d.ok = true; touch(); S.part = 'ia'; render(); focusMain();
+        } }, ['Continuar a la IA', icon('right')])])
+    ]));
+    if (!partOneDone(p)) main.appendChild(el('section', { class: 'locked', 'aria-disabled': 'true' }, [
+      el('span', { class: 'ic', 'aria-hidden': 'true' }, [icon('lock', 20)]),
+      el('div', { class: 'head-t', style: 'gap:2px' }, [el('span', { style: 'font-weight:600;font-size:17px', text: 'Parte 2 · Llenar los 7 días con IA' }),
+        el('span', { style: 'font-size:14px', text: 'Se abre cuando termines los datos del paciente.' })])
+    ]));
+    if (!p.name) setTimeout(function () { var n = document.getElementById('f-nom'); if (n) n.focus(); }, 0);
+  }
+  function step1AI(main, p, d) {
+    var chips = [isNone(d.cond) ? 'Sin condición' : d.cond.trim(),
+      isNone(d.nogusta) ? 'Sin alimentos que no le gusten' : 'No le gusta: ' + d.nogusta.trim(),
+      isNone(d.alergia) ? 'Sin alergias' : 'Alergias: ' + d.alergia.trim()];
+    main.appendChild(el('section', { class: 'card pcard', style: 'padding:18px 24px' }, [
+      el('div', { class: 'who', style: 'gap:14px' }, [el('span', { class: 'done-ic', 'aria-hidden': 'true' }, [icon('check', 18)]),
+        el('div', { class: 'head-t', style: 'gap:6px;min-width:0' }, [el('span', { style: 'font-weight:600;font-size:17px', text: 'Parte 1 · Datos del paciente listos' }),
+          el('div', { class: 'chips', style: 'gap:6px;margin:0' }, chips.map(function (c) { return el('span', { class: 'chip', text: c }); }))])]),
+      el('button', { class: 'btn', type: 'button', onclick: function () { S.part = 'datos'; render(); focusMain(); }, text: 'Editar datos' })
+    ]));
+
+    var shown = el('textarea', { readonly: true, 'aria-label': 'Instrucciones para la IA', hidden: !S.showPrompt, style: 'min-height:220px', onfocus: function (e) { e.target.select(); } });
+    if (S.showPrompt) shown.value = aiPrompt(d);
+    var view = el('button', { class: 'link', type: 'button', 'aria-expanded': String(S.showPrompt), text: S.showPrompt ? 'Ocultar instrucciones' : 'Ver instrucciones', onclick: function () { setShown(!S.showPrompt); } });
+    function setShown(on) {
+      S.showPrompt = on; shown.hidden = !on; if (on) shown.value = aiPrompt(d);
+      view.textContent = on ? 'Ocultar instrucciones' : 'Ver instrucciones'; view.setAttribute('aria-expanded', String(on));
+    }
+    var ta = el('textarea', { id: 'resp', class: 'paste', rows: '5', placeholder: 'Pega aquí la respuesta completa' });
+    var msg = el('p', { class: 'err', role: 'alert' });
+    function apply() {
+      msg.textContent = '';
+      var days; try { days = parseAI(ta.value); } catch (e) { msg.textContent = e.message; return; }
+      if (hasMeals(p) && !confirm('Se reemplazarán las comidas de los 7 días de este plan. ¿Continuar?')) return;
+      applyAI(p, days); resetShop(p); touch(); persist();
+      S.step = 2; S.day = 0; render(); focusMain(); toast('Listo. Revisa y ajusta cada día.');
+    }
+    main.appendChild(el('section', { class: 'card focus stack', style: 'gap:24px' }, [
+      el('span', { class: 'eb', style: 'margin-bottom:-12px', text: 'Parte 2 de 2' }),
+      titleIc('spark', 'Llenar los 7 días con IA', 'Dos pasos y el plan queda listo para revisar.'),
+      el('ol', { class: 'vsteps' }, [
+        vstep(1, 'Copia las instrucciones', 'Pégalas en tu asistente de IA y espera a que termine de responder.', [
+          el('div', { class: 'row' }, [el('button', { class: 'btn primary', type: 'button', onclick: function () {
+            var t = aiPrompt(d);
+            copyText(t, 'Instrucciones copiadas', function () { setShown(true); shown.focus(); toast('Selecciona y copia las instrucciones'); });
+          } }, [icon('copy'), 'Copiar instrucciones']), view]),
+          shown
+        ]),
+        vstep(2, 'Pega la respuesta', 'Copia todo lo que respondió y pégalo aquí.', [ta, msg,
+          el('div', { class: 'row', style: 'gap:14px' }, [el('button', { class: 'btn primary', type: 'button', onclick: apply, text: 'Poner en el plan' }),
+            el('span', { class: 'hint row', style: 'gap:8px' }, [icon('info'), 'Reemplaza las comidas de los 7 días.'])])
+        ], true, 'resp')
+      ]),
+      el('div', { class: 'note' }, [icon('lock'), 'Las instrucciones no incluyen el nombre del paciente.'])
+    ]));
+    main.appendChild(bottomNav(p, 0, 2, { plain: true }));
+  }
+
+  /* ---------- paso 2: comidas por día ---------- */
+  /* Un renglón que empieza con "# " es el nombre del platillo: la app lo muestra como título, sin casilla.
+     Aquí va en su propio campo (el primero de la comida). */
   function isDish(t) { return t.slice(0, 2) === '# '; }
   function dishText(t) { return isDish(t) ? t.slice(2) : t; }
-  function listEditor(arr, label, placeholder, onChange, dishes) {
-    var box = el('div');
-    function draw(focusIdx) {
-      box.replaceChildren();
-      arr.forEach(function (txt, i) {
-        var dish = dishes && isDish(txt);
-        var inp = el('input', { type: 'text', class: dish ? 'dish' : null, value: dishes ? dishText(txt) : txt, 'aria-label': (dish ? 'Platillo ' : label + ' ') + (i + 1), placeholder: dish ? 'Ej. Chilaquiles' : placeholder,
-          oninput: function (e) { arr[i] = (dishes && isDish(arr[i]) ? '# ' : '') + e.target.value; onChange(); },
-          onkeydown: function (e) { if (e.key === 'Enter') { e.preventDefault(); arr.splice(i + 1, 0, ''); onChange(); draw(i + 1); } } });
-        var mark = dishes ? el('button', { class: 'dish-btn', type: 'button', 'aria-pressed': dish, title: 'Nombre del platillo (sin casilla en la app)', text: 'Platillo',
-          onclick: function () { arr[i] = isDish(arr[i]) ? dishText(arr[i]) : '# ' + arr[i]; onChange(); draw(i); } }) : null;
-        box.appendChild(el('div', { class: 'item' }, [inp, mark, el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Quitar: ' + (dishText(txt) || label + ' ' + (i + 1)), onclick: function () { arr.splice(i, 1); onChange(); draw(Math.max(0, i - 1)); }, text: '✕' })]));
-        if (i === focusIdx) setTimeout(function () { inp.focus(); }, 0);
-      });
-      box.appendChild(el('button', { class: 'btn small', type: 'button', style: 'margin-top:4px', onclick: function () { arr.push(''); onChange(); draw(arr.length - 1); }, text: '+ Agregar' }));
+  function fmtTime(t) { var m = /^(\d{1,2}):(\d{2})/.exec(t || ''); if (!m) return ['--:--', '']; var h = +m[1]; return [((h % 12) || 12) + ':' + m[2], h < 12 ? 'a. m.' : 'p. m.']; }
+  function isSnack(m) { return norm(m.name || '').indexOf('COLACION') >= 0; }
+  function byTime(a, b) { return (a.time || '').localeCompare(b.time || ''); }
+  function nMeals(c) { return c + (c === 1 ? ' comida' : ' comidas'); }
+  function step2(main, p) {
+    var meals = p.days[S.day];
+    function foodChanged() { resetShop(p); touch(); }
+    main.appendChild(el('div', { class: 'days', role: 'group', 'aria-label': 'Día de la semana' }, DAYS.map(function (n, i) {
+      var c = p.days[i].length;
+      return el('button', { class: 'day', type: 'button', 'aria-pressed': S.day === i, 'aria-label': n + ', ' + nMeals(c), onclick: function () { S.day = i; S.copyOpen = false; S.timeEdit = -1; render(); } },
+        [DAY_S[i], el('small', { text: nMeals(c) })]);
+    })));
+
+    var sub = !meals.length ? 'Sin comidas' : meals.length === 1 ? '1 comida · ' + fmtTime(meals[0].time).join(' ') :
+      nMeals(meals.length) + ' · de ' + fmtTime(meals[0].time).join(' ') + ' a ' + fmtTime(meals[meals.length - 1].time).join(' ');
+    function copyPanel() {
+      var box = el('div', { class: 'copyto' }, [
+        el('div', { class: 'head-t', style: 'gap:2px' }, [el('span', { style: 'font-weight:600', text: 'Copiar el ' + DAYS[S.day].toLowerCase() + ' a:' }), el('span', { class: 'hint', text: 'Reemplaza las comidas de los días que elijas.' })]),
+        el('div', { class: 'row', style: 'gap:0 12px' }, DAYS.map(function (n, i) { return i === S.day ? null : el('label', null, [el('input', { type: 'checkbox', value: String(i) }), n]); })),
+        el('div', { class: 'row' }, [
+          el('button', { class: 'btn primary', type: 'button', onclick: function () {
+            var any = false; box.querySelectorAll('input:checked').forEach(function (c) { p.days[+c.value] = clone(meals); any = true; });
+            if (any) { S.copyOpen = false; foodChanged(); render(); toast('Día copiado'); } else toast('Elige al menos un día');
+          }, text: 'Copiar' }),
+          el('button', { class: 'btn', type: 'button', onclick: function () { S.copyOpen = false; render(); }, text: 'Cancelar' })
+        ])
+      ]);
+      return box;
     }
-    draw(-1); box.draw = draw; return box;
+    function mealRow(m, mi, focusIdx) {
+      var row = el('div', { class: 'mrow' });
+      function redraw(f) { row.replaceWith(mealRow(m, mi, f)); }
+      function hasDish() { return m.items.length > 0 && isDish(m.items[0]); }
+      function off() { return hasDish() ? 1 : 0; }
+      var when = el('div', { class: 'when' + (isSnack(m) ? ' snack' : '') });
+      if (S.timeEdit === mi) {
+        var fin = false;
+        var finish = function () { if (fin) return; fin = true; S.timeEdit = -1; meals.sort(byTime); setTimeout(render, 0); };
+        var tin = el('input', { type: 'time', class: 'in tin', value: m.time, 'aria-label': 'Hora de ' + (m.name || 'la comida'),
+          onchange: function (e) { if (e.target.value) { m.time = e.target.value; touch(); } }, onblur: finish,
+          onkeydown: function (e) { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); finish(); } } });
+        when.appendChild(tin); setTimeout(function () { tin.focus(); }, 0);
+      } else {
+        var tm = fmtTime(m.time);
+        when.appendChild(el('span', { class: 't' }, [tm[0], el('small', { text: tm[1] })]));
+      }
+      when.appendChild(el('input', { class: 'm', type: 'text', value: m.name, 'aria-label': 'Nombre de la comida', placeholder: 'Comida',
+        oninput: function (e) { m.name = e.target.value; when.classList.toggle('snack', isSnack(m)); touch(); } }));
+      if (S.timeEdit !== mi) when.appendChild(el('button', { class: 'ch', type: 'button', 'aria-label': 'Cambiar hora de ' + (m.name || 'la comida'), text: 'Cambiar hora', onclick: function () { S.timeEdit = mi; render(); } }));
+
+      var dishIn = el('input', { type: 'text', value: hasDish() ? dishText(m.items[0]) : '', placeholder: 'Nombre del platillo (opcional)', 'aria-label': 'Platillo de ' + (m.name || 'la comida'),
+        oninput: function (e) { if (hasDish()) m.items[0] = '# ' + e.target.value; else if (e.target.value) m.items.unshift('# ' + e.target.value); touch(); } });
+      var ul = el('ul', { class: 'ing', 'aria-label': 'Ingredientes de ' + (m.name || 'la comida') });
+      var ings = m.items.slice(off());
+      ings.forEach(function (t, j) {
+        var inp = el('input', { type: 'text', value: t, 'aria-label': 'Ingrediente ' + (j + 1), placeholder: 'Ej. 2 huevos',
+          oninput: function (e) { m.items[j + off()] = e.target.value; foodChanged(); },
+          onkeydown: function (e) { if (e.key === 'Enter') { e.preventDefault(); m.items.splice(j + off() + 1, 0, ''); touch(); redraw(j + 1); } } });
+        ul.appendChild(el('li', null, [inp, el('button', { class: 'ib', type: 'button', 'aria-label': 'Quitar ' + (t || 'ingrediente'), onclick: function () {
+          var had = !!m.items[j + off()].trim(); m.items.splice(j + off(), 1); if (had) foodChanged(); else touch(); redraw(j > 0 ? j - 1 : ings.length > 1 ? 0 : -1);
+        } }, [icon('x', 14)])]));
+        if (j === focusIdx) setTimeout(function () { inp.focus(); }, 0);
+      });
+      row.append(when, el('div', { class: 'mbody' }, [
+        el('div', { class: 'dh' }, [dishIn, el('button', { class: 'ib', type: 'button', 'aria-label': 'Quitar ' + (m.name || 'la comida'), title: 'Quitar comida', onclick: function () {
+          var had = m.items.some(function (t) { return t.trim() && !isDish(t); });
+          if (had && !confirm('¿Quitar “' + (m.name || 'la comida') + '” de este día?')) return;
+          meals.splice(mi, 1); if (had) foodChanged(); else touch(); render();
+        } }, [icon('trash')])]),
+        ul,
+        el('button', { class: 'add', type: 'button', onclick: function () { m.items.push(''); touch(); redraw(m.items.length - 1 - off()); } }, [icon('plus', 16), 'Agregar ingrediente'])
+      ]));
+      return row;
+    }
+    var tl = el('div');
+    meals.forEach(function (m, mi) { tl.appendChild(mealRow(m, mi)); });
+    if (!meals.length) tl.appendChild(el('p', { class: 'hint', text: 'Este día no tiene comidas.' }));
+    main.appendChild(el('section', { class: 'card dayc', 'aria-label': DAYS[S.day] }, [
+      el('div', { class: 'dayh' }, [
+        el('div', { class: 'head-t', style: 'gap:2px' }, [el('h2', { text: DAYS[S.day] }), el('span', { class: 'muted', style: 'font-size:15px', text: sub })]),
+        el('button', { class: 'btn', type: 'button', 'aria-expanded': String(!!S.copyOpen), onclick: function () { S.copyOpen = !S.copyOpen; render(); } }, [icon('copy'), 'Copiar a otros días'])
+      ]),
+      S.copyOpen ? copyPanel() : null,
+      tl,
+      el('button', { class: 'btn dashed', type: 'button', style: 'align-self:flex-start', disabled: meals.length >= 12, onclick: function () {
+        meals.push({ name: 'Comida', time: '12:00', items: [] }); meals.sort(byTime); touch(); render();
+      } }, [icon('plus'), 'Agregar comida'])
+    ]));
+    main.appendChild(bottomNav(p, 1, 3));
   }
+
+  /* ---------- paso 3: indicaciones ---------- */
   /* Botones para agregar indicaciones comunes con un toque. Se ocultan las que ya están en la lista. */
   var SUGGEST = {
     daily: ['Probiótico en ayunas', 'Colágeno en la mañana', 'Caminar 30 minutos', 'Dormir de 7 a 8 horas', 'Multivitamínico con el desayuno'],
     avoid: ['Refrescos y jugos industrializados', 'Pan dulce', 'Frituras', 'Alcohol', 'Comida rápida', 'Azúcar añadida', 'Embutidos'],
     prep: ['Hornear o asar, evitar freír', 'Pesar los alimentos en crudo', 'Cocinar con poco aceite', 'Usar aceite de oliva o de aguacate', 'Verduras al vapor', 'No agregar sal en la mesa']
   };
-  function suggestions(arr, list, editor, onChange) {
-    var row = el('div', { class: 'chips noprint' });
-    function draw() {
-      var have = arr.map(function (t) { return t.trim().toLowerCase(); });
-      var left = list.filter(function (t) { return have.indexOf(t.toLowerCase()) < 0; });
-      row.replaceChildren();
-      if (!left.length) return;
-      row.appendChild(el('span', { class: 'hint', text: 'Agregar rápido:' }));
-      left.forEach(function (t) {
-        row.appendChild(el('button', { class: 'chip', type: 'button', 'aria-label': 'Agregar: ' + t, onclick: function () {
-          var i = arr.indexOf(''); if (i >= 0) arr[i] = t; else arr.push(t);
-          onChange(); editor.draw(-1); draw();
-        }, text: '+ ' + t }));
-      });
+  function sec(ic, title, sub, kids) {
+    return el('section', { class: 'card sec' }, [el('div', { class: 'sh' }, [el('span', { class: 'ico', 'aria-hidden': 'true' }, [icon(ic, 20)]),
+      el('div', null, [el('h2', { text: title }), el('span', { class: 'muted', style: 'font-size:14px', text: sub })])])].concat(kids));
+  }
+  function step3(main, p) {
+    var out = el('output', { 'aria-live': 'polite' }), liters = el('strong');
+    function show() {
+      var l = p.glasses * 0.25;
+      out.textContent = String(p.glasses);
+      liters.textContent = l.toLocaleString('es-MX', { maximumFractionDigits: 2 }) + (l === 1 ? ' litro' : ' litros');
     }
-    draw(); row.draw = draw; return row;
+    function chg(dv) { var v = p.glasses + dv; if (v < 1 || v > 30) return; p.glasses = v; touch(); show(); }
+    show();
+    var box = el('div', { class: 'stack', style: 'gap:16px' }, [
+      sec('drop', 'Agua', 'Vasos de 250 ml al día', [el('div', { class: 'row', style: 'gap:20px' }, [
+        el('div', { class: 'stepper' }, [el('button', { type: 'button', 'aria-label': 'Un vaso menos', onclick: function () { chg(-1); }, text: '−' }), out,
+          el('button', { type: 'button', 'aria-label': 'Un vaso más', onclick: function () { chg(1); }, text: '+' })]),
+        el('span', null, ['= ', liters, ' al día'])
+      ])])
+    ]);
+    [['daily', 'cal', 'Cada día', 'Lo que hace todos los días', 'Agregar hábito diario'],
+     ['avoid', 'ban', 'Evitar', 'Alimentos o hábitos', 'Agregar algo que evitar'],
+     ['prep', 'pot', 'Preparación', 'Cómo cocinar los alimentos', 'Agregar indicación de preparación']].forEach(function (s) { box.appendChild(pillSec(p, s)); });
+    main.append(box, bottomNav(p, 2, 4));
+  }
+  /* Etiquetas que se quitan con una x, un campo para agregar y sugerencias rápidas. */
+  function pillSec(p, s) {
+    var key = s[0], arr = p[key];
+    for (var i = arr.length - 1; i >= 0; i--) if (!String(arr[i]).trim()) arr.splice(i, 1);
+    var pills = el('div', { class: 'pills' }), sug = el('div', { class: 'sug' });
+    function has(t) { return arr.some(function (x) { return x.trim().toLowerCase() === t.toLowerCase(); }); }
+    function add(t) { t = t.trim(); if (!t) return; if (!has(t)) { arr.push(t); touch(); } draw(); }
+    var inp = el('input', { class: 'in', type: 'text', 'aria-label': s[4], placeholder: 'Escribe y presiona Enter',
+      onkeydown: function (e) { if (e.key === 'Enter') { e.preventDefault(); add(inp.value); inp.value = ''; } } });
+    function draw() {
+      pills.replaceChildren();
+      arr.forEach(function (t, i) {
+        pills.appendChild(el('span', { class: 'pill' }, [t, el('button', { type: 'button', 'aria-label': 'Quitar: ' + t, onclick: function () { arr.splice(i, 1); touch(); draw(); inp.focus(); } }, [icon('x', 14)])]));
+      });
+      if (!arr.length) pills.appendChild(el('span', { class: 'hint', text: 'Nada todavía.' }));
+      var left = SUGGEST[key].filter(function (t) { return !has(t); });
+      sug.replaceChildren(); sug.hidden = !left.length;
+      if (!left.length) return;
+      sug.appendChild(el('span', { class: 'muted', style: 'font-size:14px', text: 'Sugerencias:' }));
+      left.forEach(function (t) { sug.appendChild(el('button', { type: 'button', 'aria-label': 'Agregar: ' + t, onclick: function () { add(t); }, text: '+ ' + t })); });
+    }
+    draw();
+    return sec(s[1], s[2], s[3], [pills,
+      el('div', { class: 'addrow' }, [inp, el('button', { class: 'btn', type: 'button', onclick: function () { add(inp.value); inp.value = ''; inp.focus(); }, text: 'Agregar' })]),
+      sug]);
   }
   function cleanPlan(p) {
     p.daily = p.daily.filter(function (s) { return s.trim(); }); p.avoid = p.avoid.filter(function (s) { return s.trim(); }); p.prep = p.prep.filter(function (s) { return s.trim(); });
     p.days.forEach(function (d) { d.forEach(function (m) { m.items = m.items.map(function (s) { s = s.trim(); return s === '#' ? '' : s; }).filter(Boolean); m.name = m.name.trim() || 'Comida'; }); });
-  }
-
-  function buildEditor(main, p) {
-    main.appendChild(el('div', { class: 'field', style: 'margin-top:12px' }, [
-      el('label', { for: 'pname', text: 'Nombre del paciente' }),
-      el('input', { type: 'text', id: 'pname', value: p.name, autocomplete: 'off', oninput: function (e) { p.name = e.target.value; touch(); } })
-    ]));
-    main.appendChild(el('div', { class: 'tabs', role: 'group', 'aria-label': 'Sección' }, [
-      el('button', { 'aria-pressed': S.tab === 'ia', onclick: function () { S.tab = 'ia'; render(); }, text: 'Llenar con IA' }),
-      el('button', { 'aria-pressed': S.tab === 'dias', onclick: function () { S.tab = 'dias'; render(); }, text: 'Comidas por día' }),
-      el('button', { 'aria-pressed': S.tab === 'general', onclick: function () { S.tab = 'general'; render(); }, text: 'Indicaciones generales' }),
-      el('button', { 'aria-pressed': S.tab === 'compras', onclick: function () { S.tab = 'compras'; render(); }, text: 'Lista de compras' })
-    ]));
-    if (S.tab === 'dias') editDays(main, p); else if (S.tab === 'ia') buildAI(main, p); else if (S.tab === 'compras') buildShopAI(main, p); else editGeneral(main, p);
-
-    main.appendChild(el('div', { class: 'status noprint', id: 'status', role: 'status', 'aria-live': 'polite', text: saved ? 'Guardado' : '', style: 'margin-top:8px' }));
-    /* Generar QR, Duplicar y Guardar como plantilla solo en Lista de compras: es el último paso.
-       El QR se activa cuando la IA ya revisó todos los renglones. */
-    var last = S.tab === 'compras', ready = last && planLines(p).length > 0 && !shopPending(p).length;
-    main.appendChild(el('div', { class: 'row noprint', style: 'margin:12px 0 24px' }, [
-      last ? el('button', { class: 'btn primary', disabled: !ready, onclick: function () { goQR(p); }, text: 'Generar QR' }) : null,
-      last ? el('button', { class: 'btn', onclick: function () { var c = clone(p); c.id = uid(); c.name = p.name + ' (copia)'; c.updated = nowSec(); plans.push(c); S.sel = c.id; persist(); render(); toast('Plan duplicado'); }, text: 'Duplicar' }) : null,
-      last ? el('button', { class: 'btn', onclick: function () { var n = prompt('Nombre de la plantilla (sin datos del paciente):', ''); if (!n) return; var c = clone(p); c.tplName = n.trim(); c.name = ''; delete c.ai; templates.push(c); persist(); toast('Plantilla guardada'); }, text: 'Guardar como plantilla' }) : null,
-      el('button', { class: 'btn danger', onclick: function () { if (confirm('¿Eliminar el plan de ' + (p.name || 'este paciente') + '? No se puede deshacer.')) { plans = plans.filter(function (x) { return x !== p; }); persist(); S.sel = null; S.view = 'none'; render(); } }, text: 'Eliminar' })
-    ]));
-    if (last && !ready) main.appendChild(el('p', { class: 'hint noprint', style: 'margin-top:-16px', text: 'Generar QR se activa cuando la IA ya revisó la lista de compras (pasos 1 y 2).' }));
-  }
-
-  function editGeneral(main, p) {
-    main.appendChild(el('div', { class: 'field' }, [
-      el('label', { for: 'gl', text: 'Vasos de agua al día (de 250 ml)' }),
-      el('input', { type: 'number', id: 'gl', min: '1', max: '30', value: String(p.glasses), style: 'max-width:120px', oninput: function (e) { var v = parseInt(e.target.value, 10); if (v >= 1 && v <= 30) { p.glasses = v; touch(); } } })
-    ]));
-    [['daily', 'Cada día', 'Ej. Probiótico en ayunas', 'Lo que el paciente hace todos los días.'],
-     ['avoid', 'Evitar', 'Ej. Refrescos', 'Alimentos o hábitos que debe evitar.'],
-     ['prep', 'Preparación', 'Ej. Hornear en vez de freír', 'Cómo preparar los alimentos.']].forEach(function (s) {
-      main.appendChild(el('div', { class: 'sub', text: s[1] }));
-      main.appendChild(el('p', { class: 'hint', text: s[3] }));
-      var chips, editor = listEditor(p[s[0]], s[1], s[2], function () { touch(); if (chips) chips.draw(); });
-      chips = suggestions(p[s[0]], SUGGEST[s[0]], editor, touch);
-      main.appendChild(editor); main.appendChild(chips);
-    });
-  }
-
-  function editDays(main, p) {
-    var dayRow = el('div', { class: 'days', role: 'group', 'aria-label': 'Día de la semana' });
-    DAYS.forEach(function (n, i) { dayRow.appendChild(el('button', { class: 'day', 'aria-pressed': S.day === i, 'aria-label': n, onclick: function () { S.day = i; render(); }, text: DAY_L[i] })); });
-    main.appendChild(dayRow);
-    main.appendChild(el('h2', { text: DAYS[S.day], style: 'margin-bottom:10px' }));
-    var meals = p.days[S.day];
-    function foodChanged() { resetShop(p); touch(); }
-    meals.forEach(function (m, mi) {
-      var items = listEditor(m.items, 'Alimento', 'Ej. 2 huevos', foodChanged, true);
-      main.appendChild(el('section', { class: 'card meal', 'aria-label': m.name }, [
-        el('div', { class: 'head' }, [
-          el('input', { type: 'text', value: m.name, 'aria-label': 'Nombre de la comida', oninput: function (e) { m.name = e.target.value; touch(); } }),
-          el('input', { type: 'time', value: m.time, 'aria-label': 'Hora de ' + m.name, oninput: function (e) { m.time = e.target.value || m.time; touch(); } }),
-          el('button', { class: 'icon-btn', 'aria-label': 'Quitar la comida ' + m.name, onclick: function () { if (!m.items.length || confirm('¿Quitar “' + m.name + '” de este día?')) { var had = m.items.length; meals.splice(mi, 1); if (had) foodChanged(); else touch(); render(); } }, text: '✕' })
-        ]), items
-      ]));
-    });
-    main.appendChild(el('button', { class: 'btn small', onclick: function () { if (meals.length >= 12) return; meals.push({ name: 'Comida', time: '12:00', items: [] }); touch(); render(); }, text: '+ Agregar comida' }));
-
-    var boxes = DAYS.map(function (n, i) { return i === S.day ? null : el('label', { class: 'row', style: 'min-height:44px;gap:6px' }, [el('input', { type: 'checkbox', value: String(i), style: 'width:22px;height:22px' }), n]); });
-    var det = el('details', { class: 'card noprint', style: 'margin-top:14px' }, [
-      el('summary', { text: 'Copiar este día a otros días', style: 'min-height:44px;cursor:pointer;font-weight:600;display:flex;align-items:center' }),
-      el('div', { class: 'row' }, boxes),
-      el('button', { class: 'btn small', style: 'margin-top:8px', onclick: function () {
-        var any = false; det.querySelectorAll('input:checked').forEach(function (c) { p.days[+c.value] = clone(meals); any = true; });
-        if (any) { foodChanged(); render(); toast('Día copiado'); } else toast('Elige al menos un día');
-      }, text: 'Copiar' })
-    ]);
-    main.appendChild(det);
   }
 
   /* ---------- llenar con IA ---------- */
@@ -516,46 +847,6 @@
       }).filter(function (m) { return m.items.length; });
     });
   }
-  function buildAI(main, p) {
-    var d = p.ai || (p.ai = {});
-    AI_FIELDS.forEach(function (f) { if (typeof d[f[0]] !== 'string') d[f[0]] = ''; });
-    main.appendChild(el('p', { class: 'hint', text: 'Genera los 7 días con ChatGPT u otra IA. Las instrucciones no incluyen el nombre del paciente.' }));
-
-    main.appendChild(el('div', { class: 'sub', text: '1. Datos del paciente' }));
-    AI_FIELDS.forEach(function (f) {
-      main.appendChild(el('div', { class: 'field' }, [
-        el('label', { for: 'ai-' + f[0], text: f[1] }),
-        el('input', { type: 'text', id: 'ai-' + f[0], value: d[f[0]], placeholder: f[2], autocomplete: 'off', oninput: function (e) { d[f[0]] = e.target.value; touch(); } })
-      ]));
-    });
-
-    main.appendChild(el('div', { class: 'sub', text: '2. Copiar las instrucciones' }));
-    main.appendChild(el('p', { class: 'hint', text: 'Pégalas en ChatGPT, Gemini, Claude u otra IA y espera la respuesta.' }));
-    var shown = el('textarea', { readonly: true, 'aria-label': 'Instrucciones para la IA', style: 'min-height:220px', onfocus: function (e) { e.target.select(); } });
-    var det = el('details', { class: 'card', ontoggle: function () { shown.value = aiPrompt(d); } }, [el('summary', { text: 'Ver las instrucciones', style: 'min-height:44px;cursor:pointer;font-weight:600;display:flex;align-items:center' }), shown]);
-    main.appendChild(el('div', { class: 'row', style: 'margin-bottom:10px' }, [el('button', { class: 'btn primary', onclick: function () {
-      var t = aiPrompt(d);
-      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('Instrucciones copiadas'); },
-        function () { det.open = true; shown.value = t; shown.focus(); toast('Selecciona y copia las instrucciones'); });
-    }, text: 'Copiar instrucciones' })]));
-    main.appendChild(det);
-
-    main.appendChild(el('div', { class: 'sub', text: '3. Pegar la respuesta' }));
-    main.appendChild(el('p', { class: 'hint', text: 'Copia la respuesta completa de la IA y pégala aquí. Se reemplazan las comidas de los 7 días; después puedes ajustarlas.' }));
-    var ta = el('textarea', { 'aria-label': 'Respuesta de la IA', placeholder: '{ "DESAYUNO": { "LUNES": ["…"] } … }', style: 'min-height:160px' });
-    var msg = el('p', { class: 'err', role: 'alert' });
-    main.appendChild(ta);
-    main.appendChild(el('div', { class: 'row', style: 'margin-top:8px' }, [el('button', { class: 'btn primary', onclick: function () {
-      msg.textContent = '';
-      var days; try { days = parseAI(ta.value); } catch (e) { msg.textContent = e.message; return; }
-      var has = p.days.some(function (day) { return day.some(function (m) { return m.items.length; }); });
-      if (has && !confirm('Se reemplazarán las comidas de los 7 días de este plan. ¿Continuar?')) return;
-      applyAI(p, days); resetShop(p); touch(); persist();
-      S.tab = 'dias'; S.day = 0; render(); focusMain(); toast('Listo. Revisa y ajusta cada día.');
-    }, text: 'Poner en el plan' })]));
-    main.appendChild(msg);
-  }
-
   /* ---------- lista de compras con IA ---------- */
   /* Al terminar el plan, la IA dice qué se compra de cada renglón ("Limón y chile en polvo" → Limón, Chile en polvo)
      con nombres iguales en todo el plan. Se guarda en p.shop y va en el QR (clave c); la app suma por día con eso. */
@@ -599,53 +890,17 @@
   /* Nunca hay QR sin la lista de compras revisada (el botón está desactivado; esto es por si acaso). */
   function goQR(p) {
     cleanPlan(p); touch(); persist();
-    if (shopPending(p).length) { S.view = 'edit'; S.tab = 'compras'; render(); focusMain(); toast('Antes del QR, revisa la lista de compras'); return; }
-    S.view = 'qr'; render(); focusMain();
+    S.copyOpen = false; S.paste = false; S.timeEdit = -1;
+    if (shopPending(p).length) { S.step = 4; render(); focusMain(); toast('Antes de compartir, genera la lista de compras'); return; }
+    S.step = 5; render(); focusMain();
   }
   /* Si cambia la comida del plan, la lista revisada se borra completa: la IA la vuelve a hacer con el plan nuevo
      (las unidades de compra dependen de todo el plan). */
   function resetShop(p) {
     if (!p.shop || !Object.keys(p.shop).length) return;
-    p.shop = {}; toast('Cambió la comida: hay que revisar otra vez la lista de compras');
+    p.shop = {}; p.shopDone = {}; toast('Cambió la comida: hay que revisar otra vez la lista de compras');
   }
   function shopPending(p) { var s = p.shop || {}; return planLines(p).filter(function (t) { return !s.hasOwnProperty(t); }); }
-  function buildShopAI(main, p) {
-    var lines = planLines(p), pending = shopPending(p);
-    if (!lines.length) { main.appendChild(el('p', { class: 'muted', text: 'Primero llena las comidas del plan.' })); return; }
-    if (pending.length) main.appendChild(el('p', { class: 'err', role: 'status', text: pending.length === lines.length ? 'Aún no se revisa la lista de compras.' :
-      pending.length + ' de ' + lines.length + (lines.length === 1 ? ' renglón' : ' renglones') + ' sin revisar (la IA no los incluyó): ' + pending.join(' · ') + '. Vuelve a hacer los pasos 1 y 2.' }));
-
-    main.appendChild(el('div', { class: 'sub', text: '1. Copiar las instrucciones' }));
-    main.appendChild(el('p', { class: 'hint', text: 'Llevan los alimentos del plan, sin el nombre del paciente. Pégalas en la IA y espera la respuesta.' }));
-    main.appendChild(el('div', { class: 'row', style: 'margin-bottom:10px' }, [el('button', { class: 'btn primary', onclick: function () {
-      var t = shopPrompt(lines);
-      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('Instrucciones copiadas'); },
-        function () { ta.value = t; ta.focus(); ta.select(); toast('Selecciona y copia las instrucciones'); });
-    }, text: 'Copiar instrucciones' })]));
-
-    main.appendChild(el('div', { class: 'sub', text: '2. Pegar la respuesta' }));
-    var ta = el('textarea', { 'aria-label': 'Respuesta de la IA', placeholder: '{ "Limón y chile en polvo": ["Limón", "Chile en polvo"], … }', style: 'min-height:140px' });
-    var msg = el('p', { class: 'err', role: 'alert' });
-    main.appendChild(ta);
-    main.appendChild(el('div', { class: 'row', style: 'margin-top:8px' }, [el('button', { class: 'btn primary', onclick: function () {
-      msg.textContent = '';
-      var r; try { r = parseShopAI(ta.value, lines); } catch (e) { msg.textContent = e.message; return; }
-      /* Se suma a lo ya revisado: si la IA dejó fuera renglones, siguen pendientes y no hay QR todavía. */
-      p.shop = Object.assign({}, p.shop, r); touch(); persist();
-      var left = shopPending(p).length;
-      toast(left ? 'Faltan ' + left + (left === 1 ? ' renglón' : ' renglones') + ' por revisar' : 'Lista de compras revisada');
-      render();
-    }, text: 'Guardar lista' })]));
-    main.appendChild(msg);
-
-    /* Para que la doctora vea qué cambió: solo los renglones que la IA separó o renombró. */
-    var s = p.shop || {}, changed = lines.filter(function (t) { return s[t] && !(s[t].length === 1 && s[t][0] === t); });
-    if (changed.length) {
-      main.appendChild(el('div', { class: 'sub', text: 'Lo que se compra' }));
-      main.appendChild(el('ul', { class: 'hint' }, changed.map(function (t) { return el('li', { text: t + ' → ' + (s[t].length ? s[t].join(' · ') : 'nada') }); })));
-    }
-  }
-
   /* ---------- QR ---------- */
   /* Un código v2 va en dos partes: el prefijo en modo alfanumérico y los dígitos en modo numérico. */
   function makeQR(text) {
@@ -709,15 +964,16 @@
     return { tw: tw * fit, fs: lb.fs * Math.max(fit, 0.55), squeeze: fit < 0.55, w: Math.min(lb.maxW, tw * fit + 2 * padX) };
   }
   function xmlEsc(t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-  function qrSvg(q, name) {
+  function qrSvg(q, name, id) {   // id: para que cada corazón de la página tenga su propio recorte
+    var hc = 'hc' + (id || '');
     var L = heartLayout(q), d = L.cells.map(function (p) { return 'M' + p[0] + ',' + p[1] + 'h1v1h-1z'; }).join('');
     var lb = L.label, z = labelSize(lb, name);
     var label = '<rect x="' + (lb.cx - z.w / 2).toFixed(2) + '" y="' + lb.y.toFixed(2) + '" width="' + z.w.toFixed(2) + '" height="' + lb.h.toFixed(2) + '" rx="' + (lb.h / 2).toFixed(2) + '" fill="#fff"/>' +
       '<text x="' + lb.cx.toFixed(2) + '" y="' + (lb.y + lb.h / 2).toFixed(2) + '" dy="0.34em" text-anchor="middle" fill="' + WINE + '" font-family="\'Cormorant Garamond\', Georgia, serif" font-weight="700" font-size="' + z.fs.toFixed(2) + '"' +
       (z.squeeze ? ' textLength="' + z.tw.toFixed(2) + '" lengthAdjust="spacingAndGlyphs"' : '') + '>' + xmlEsc(name) + '</text>';
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + L.w.toFixed(2) + ' ' + L.h.toFixed(2) + '" role="img" aria-label="Código QR del plan en forma de corazón">' +
-      '<defs><clipPath id="hc"><path d="' + L.outer + '"/></clipPath></defs>' +
-      '<path d="' + d + '" fill="' + WINE + '" clip-path="url(#hc)" shape-rendering="crispEdges"/>' + label + '</svg>';
+      '<defs><clipPath id="' + hc + '"><path d="' + L.outer + '"/></clipPath></defs>' +
+      '<path d="' + d + '" fill="' + WINE + '" clip-path="url(#' + hc + ')" shape-rendering="crispEdges"/>' + label + '</svg>';
   }
   function qrPng(q, name) {
     var L = heartLayout(q), px = Math.max(6, Math.floor(1200 / L.w)), lb = L.label, z = labelSize(lb, name);
@@ -737,15 +993,221 @@
   function download(blob, fname) { var a = el('a', { href: URL.createObjectURL(blob), download: fname }); document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
   function slug(s) { return (s || 'plan').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'plan'; }
 
-  function buildQR(main, p) {
+  /* ---------- paso 4: lista de compras ---------- */
+  /* La IA ya dijo qué se compra de cada renglón (p.shop). Aquí se agrupa por categoría y se suman
+     los ingredientes repetidos (avena 40 + 20 + 10 g = 70 g). Nada de esto cambia el código del QR. */
+  var CATS = [
+    ['Frutas y verduras', 'MANZANA PLATANO FRESA PAPAYA MELON SANDIA PINA MANGO NARANJA MANDARINA TORONJA LIMON UVA PERA KIWI DURAZNO GUAYABA ARANDANO FRAMBUESA ZARZAMORA MORA CEREZA CIRUELA FRUTA JITOMATE TOMATE TOMATILLO CEBOLLA AJO CHILE PIMIENTO CALABACITA CALABAZA BROCOLI COLIFLOR ZANAHORIA PEPINO LECHUGA ESPINACA ACELGA KALE APIO NOPAL CHAYOTE EJOTE CHAMPINON HONGO SETA BETABEL JICAMA RABANO ESPARRAGO BERENJENA ELOTE PAPA CAMOTE VERDURA ENSALADA CILANTRO PEREJIL AGUACATE GERMEN ARUGULA PORO HIERBABUENA MENTA COL CHICHARO|FRUTOS ROJOS|FRUTOS DEL BOSQUE'],
+    ['Carnes, pescados y huevo', 'POLLO PECHUGA MUSLO PIERNA PAVO RES BISTEC CARNE CERDO LOMO JAMON PESCADO SALMON ATUN TILAPIA MOJARRA CAMARON HUEVO CLARA SARDINA BACALAO MARISCO PULPO SURIMI ARRACHERA FILETE CHULETA'],
+    ['Lácteos', 'LECHE YOGUR YOGURT QUESO PANELA REQUESON CREMA MANTEQUILLA KEFIR JOCOQUE'],
+    ['Cereales y tortillas', 'TORTILLA AVENA PAN BOLILLO ARROZ PASTA QUINOA GRANOLA CEREAL TOSTADA GALLETA AMARANTO SALVADO HARINA ESPAGUETI SPAGHETTI FIDEO MAIZ CUSCUS TELERA HOTCAKE'],
+    ['Leguminosas y semillas', 'FRIJOL GARBANZO LENTEJA HABA SOYA EDAMAME CACAHUATE ALMENDRA NUEZ PISTACHE CHIA LINAZA SEMILLA AJONJOLI MARANON ALUBIA HUMMUS PEPITA|CREMA DE CACAHUATE|CREMA DE ALMENDRA|MANTEQUILLA DE CACAHUATE'],
+    ['Aceites y condimentos', 'ACEITE SAL PIMIENTA ESPECIA OREGANO COMINO CANELA VINAGRE MOSTAZA SALSA CONSOME HIERBA LAUREL TOMILLO PAPRIKA CURCUMA MIEL STEVIA ENDULZANTE VAINILLA CATSUP KETCHUP MAYONESA AZUCAR ADEREZO|CHILE EN POLVO|CHILE QUEBRADO|AJO EN POLVO|HIERBAS FINAS']
+  ].map(function (c) { var parts = c[1].split('|'); return { name: c[0], words: parts[0].split(' ').map(stem), phrases: parts.slice(1) }; });
+  var CAT_NAMES = CATS.map(function (c) { return c.name; }).concat(['Otros']);
+  /* Raíz sencilla para comparar singular y plural: "limones" y "limón" → LIMON, "jitomates" y "jitomate" → JITOMAT. */
+  function stem(w) { return w.replace(/S$/, '').replace(/E$/, ''); }
+  function nameKey(n) { return norm(n).split(/[^A-Z0-9]+/).filter(Boolean).map(stem).join(' '); }
+  /* Primero frases ("chile en polvo"); luego la primera palabra que se reconozca (en español va primero el alimento). */
+  function category(name) {
+    var n = norm(name), i, j;
+    for (i = 0; i < CATS.length; i++) for (j = 0; j < CATS[i].phrases.length; j++) if (n.indexOf(CATS[i].phrases[j]) >= 0) return CATS[i].name;
+    var words = n.split(/[^A-Z]+/).filter(Boolean).map(stem);
+    for (j = 0; j < words.length; j++) for (i = 0; i < CATS.length; i++) if (CATS[i].words.indexOf(words[j]) >= 0) return CATS[i].name;
+    return 'Otros';
+  }
+  var FRAC = { '½': 0.5, '¼': 0.25, '¾': 0.75 };
+  function toNum(t) {
+    if (FRAC[t]) return FRAC[t];
+    return t.split(/\s+/).reduce(function (s, x) { var f = x.split('/'); return s + (f.length === 2 ? +f[0] / +f[1] : +x.replace(',', '.')); }, 0);
+  }
+  /* "40 g de almendras" → 40, g, almendras. "2 jitomates" → 2, piezas, jitomates. "Pimienta" → sin cantidad. */
+  function parseIng(s) {
+    s = String(s).trim();
+    var m = /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(kg|kilos?|g|gr|grs|gramos?|ml|mililitros?|l|lt|litros?)?\.?(?=\s|$)\s*(?:de\s+)?(.*)$/i.exec(s);
+    if (!m || !m[3].trim()) return { qty: null, unit: '', name: s };
+    var v = toNum(m[1]), u = (m[2] || '').toLowerCase();
+    if (/^k/.test(u)) { v *= 1000; u = 'g'; } else if (/^g/.test(u)) u = 'g'; else if (/^m/.test(u)) u = 'ml'; else if (/^l/.test(u)) { v *= 1000; u = 'ml'; }
+    return { qty: isFinite(v) ? v : null, unit: u, name: m[3].trim() };
+  }
+  function capFirst(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+  function fmtNum(v) {
+    v = Math.round(v * 100) / 100;
+    var w = Math.floor(v), f = Math.round((v - w) * 100) / 100;
+    if (!f) return String(w);
+    var fr = { 0.25: '1/4', 0.5: '1/2', 0.75: '3/4', 0.33: '1/3', 0.67: '2/3' }[f];
+    return fr ? (w ? w + ' ' : '') + fr : v.toLocaleString('es-MX', { maximumFractionDigits: 1 });
+  }
+  function fmtQty(v, u) {
+    if (u === 'g' && v >= 1000) return fmtNum(v / 1000) + ' kg';
+    if (u === 'ml' && v >= 1000) return fmtNum(v / 1000) + ' l';
+    return fmtNum(v) + (u ? ' ' + u : '');
+  }
+  function shopList(p) {
+    var s = p.shop || {}, map = {}, order = [];
+    p.days.forEach(function (day) { day.forEach(function (m) { m.items.forEach(function (t) {
+      t = t.trim(); if (!t || isDish(t)) return;
+      (s.hasOwnProperty(t) ? s[t] : [t]).forEach(function (ing) {
+        var r = parseIng(ing); if (!r.name) return;
+        var k = r.unit + '|' + nameKey(r.name), e = map[k];
+        if (!e) { e = map[k] = { key: k, name: capFirst(r.name), unit: r.unit, parts: [], cat: category(r.name) }; order.push(e); }
+        if (r.name.length < e.name.length) e.name = capFirst(r.name);   // el nombre más corto suele ser el singular
+        if (r.qty !== null) e.parts.push(r.qty);
+      });
+    }); }); });
+    order.forEach(function (e) {
+      var sum = e.parts.reduce(function (a, b) { return a + b; }, 0);
+      e.q = e.parts.length ? fmtQty(sum, e.unit) : '';
+      e.small = e.parts.length > 5 ? e.parts.length + ' porciones' : e.parts.length > 1 ? e.parts.map(fmtNum).join(' + ') + (e.unit ? ' ' + e.unit : '') : '';
+    });
+    return order;
+  }
+  function byCat(list) {
+    var g = {};
+    list.forEach(function (e) { (g[e.cat] = g[e.cat] || []).push(e); });
+    Object.keys(g).forEach(function (c) { g[c].sort(function (a, b) { return a.name.localeCompare(b.name, 'es'); }); });
+    return g;
+  }
+  function shopText(p, list) {
+    var g = byCat(list), out = ['Lista de compras' + (p.name ? ' · ' + p.name : '')];
+    CAT_NAMES.forEach(function (c) {
+      if (!g[c]) return;
+      out.push('', c.toUpperCase());
+      g[c].forEach(function (e) { out.push('- ' + e.name + (e.q ? ': ' + e.q : '')); });
+    });
+    return out.join('\n');
+  }
+  function catGrid(p, list) {
+    var done = p.shopDone || (p.shopDone = {}), g = byCat(list), grid = el('div', { class: 'cats' });
+    CAT_NAMES.forEach(function (c) {
+      var items = g[c]; if (!items) return;
+      var open = S.shopMore[c] || items.length <= 10, shown = open ? items : items.slice(0, 8);
+      var card = el('section', { class: 'card cat' }, [el('h3', null, [c, el('span', { text: open ? String(items.length) : shown.length + ' de ' + items.length })])]);
+      shown.forEach(function (e) {
+        var lab = el('label', { class: 'it' + (done[e.key] ? ' ok' : '') }, [
+          el('input', { type: 'checkbox', checked: !!done[e.key], onchange: function (ev) {
+            if (ev.target.checked) done[e.key] = true; else delete done[e.key];
+            lab.classList.toggle('ok', ev.target.checked); softSave();
+          } }),
+          el('span', { class: 'n' }, [e.name, e.small ? el('small', { text: e.small }) : null]),
+          el('span', { class: 'q', text: e.q })
+        ]);
+        card.appendChild(lab);
+      });
+      if (!open) card.appendChild(el('button', { class: 'btn noprint', type: 'button', style: 'margin-top:10px;align-self:flex-start', onclick: function () { S.shopMore[c] = true; render(); },
+        text: items.length === 9 ? 'Ver la restante' : 'Ver las ' + (items.length - 8) + ' restantes' }));
+      grid.appendChild(card);
+    });
+    return grid;
+  }
+  /* Por platillo: lo que se compra para cada platillo y en qué días va. */
+  function dishGrid(p) {
+    var s = p.shop || {}, map = {}, order = [], grid = el('div', { class: 'cats' });
+    p.days.forEach(function (day, di) { day.forEach(function (m) {
+      var first = (m.items[0] || '').trim(), title = isDish(first) && dishText(first).trim() ? dishText(first).trim() : m.name, ings = [];
+      m.items.forEach(function (t) { t = t.trim(); if (t && !isDish(t)) ings = ings.concat(s.hasOwnProperty(t) ? s[t] : [t]); });
+      if (!ings.length) return;
+      var k = norm(title) + '|' + ings.map(norm).join('|'), e = map[k];
+      if (!e) { e = map[k] = { title: title, meal: m.name, ings: ings, days: [] }; order.push(e); }
+      if (e.days.indexOf(di) < 0) e.days.push(di);
+    }); });
+    order.forEach(function (e) {
+      grid.appendChild(el('section', { class: 'card cat' }, [
+        el('h3', { text: e.title }),
+        el('p', { class: 'days-t', text: e.meal + ' · ' + e.days.map(function (d) { return DAY_S[d]; }).join(', ') }),
+        el('ul', null, e.ings.map(function (t) { return el('li', { text: t }); }))
+      ]));
+    });
+    return grid;
+  }
+  function shopPaste(p, lines) {
+    var ta = el('textarea', { id: 'shop-resp', class: 'paste', rows: '5', placeholder: 'Pega aquí la respuesta completa' });
+    var msg = el('p', { class: 'err', role: 'alert' });
+    var btn = el('button', { class: 'btn primary', type: 'button', text: 'Guardar lista', onclick: function () {
+      msg.textContent = '';
+      var r; try { r = parseShopAI(ta.value, lines); } catch (e) { msg.textContent = e.message; return; }
+      /* Se suma a lo ya revisado: si la IA dejó fuera renglones, siguen pendientes y no se puede compartir todavía. */
+      p.shop = Object.assign({}, p.shop, r); touch(); persist(); S.paste = false;
+      var left = shopPending(p).length;
+      toast(left ? 'Faltan ' + left + (left === 1 ? ' renglón' : ' renglones') + ' por revisar' : 'Lista de compras lista');
+      render();
+    } });
+    return { ta: ta, msg: msg, btn: btn };
+  }
+  function copyShopPrompt(lines, ta) {
+    var t = shopPrompt(lines);
+    copyText(t, 'Instrucciones copiadas', function () {
+      if (!ta) return toast('Este navegador no dejó copiar.');
+      ta.value = t; ta.focus(); ta.select(); toast('Selecciona y copia las instrucciones');
+    });
+  }
+  function step4(main, p) {
+    var lines = planLines(p), pending = shopPending(p), ready = lines.length > 0 && !pending.length;
+    if (!lines.length) {
+      main.appendChild(el('section', { class: 'card stack' }, [
+        el('h2', { text: 'Lista de compras', style: 'font-size:26px' }),
+        el('p', { class: 'muted', text: 'Primero llena las comidas del plan.' }),
+        el('div', null, [el('button', { class: 'btn primary', type: 'button', onclick: function () { goStep(p, 2); }, text: 'Ir a Comidas por día' })])
+      ]));
+      main.appendChild(bottomNav(p, 3, 0)); return;
+    }
+    if (!ready) {
+      var x = shopPaste(p, lines), partial = pending.length < lines.length;
+      main.appendChild(el('section', { class: 'card focus stack', style: 'gap:24px' }, [
+        titleIc('spark', 'Generar la lista con IA', 'La IA dice qué se compra de cada alimento. Aquí se agrupa por categoría y se suman las cantidades.'),
+        partial ? el('div', { class: 'banner warn', role: 'status' }, [el('span', null, [icon('alert', 20),
+          pending.length + ' de ' + lines.length + (lines.length === 1 ? ' renglón' : ' renglones') + ' sin revisar (la IA no los incluyó): ' + pending.join(' · ') + '. Repite los dos pasos.'])]) : null,
+        el('ol', { class: 'vsteps' }, [
+          vstep(1, 'Copia las instrucciones', 'Llevan solo los alimentos del plan. Pégalas en tu asistente de IA.', [
+            el('div', { class: 'row' }, [el('button', { class: 'btn primary', type: 'button', onclick: function () { copyShopPrompt(lines, x.ta); } }, [icon('copy'), 'Copiar instrucciones'])])
+          ]),
+          vstep(2, 'Pega la respuesta', 'Copia todo lo que respondió y pégalo aquí.', [x.ta, x.msg, el('div', { class: 'row' }, [x.btn])], true, 'shop-resp')
+        ]),
+        el('div', { class: 'note' }, [icon('lock'), 'Las instrucciones no incluyen el nombre del paciente.'])
+      ]));
+    } else {
+      var y = S.paste ? shopPaste(p, lines) : null, list = shopList(p);
+      main.appendChild(el('div', { class: 'banner noprint' }, [
+        el('span', null, [icon('spark', 20), el('span', null, ['Lista generada con IA. ', el('span', { class: 'muted', text: '¿Quieres rehacerla?' })])]),
+        el('div', { class: 'row' }, [
+          el('button', { class: 'btn', type: 'button', onclick: function () { copyShopPrompt(lines, y && y.ta); }, text: 'Copiar instrucciones' }),
+          el('button', { class: 'btn', type: 'button', 'aria-expanded': String(!!S.paste), onclick: function () {
+            S.paste = !S.paste; render(); if (S.paste) setTimeout(function () { var t = document.getElementById('shop-resp'); if (t) t.focus(); }, 0);
+          }, text: 'Pegar respuesta nueva' })
+        ])
+      ]));
+      if (y) main.appendChild(el('section', { class: 'card stack noprint', style: 'gap:12px' }, [
+        el('label', { for: 'shop-resp', style: 'font-weight:600;font-size:17px', text: 'Pega la respuesta nueva' }), y.ta, y.msg,
+        el('div', { class: 'row' }, [y.btn, el('button', { class: 'btn', type: 'button', onclick: function () { S.paste = false; render(); }, text: 'Cancelar' })])
+      ]));
+      main.appendChild(el('div', { class: 'row noprint', style: 'justify-content:space-between;gap:12px' }, [
+        el('div', { class: 'seg', role: 'group', 'aria-label': 'Ver lista' }, [['cat', 'Por categoría'], ['dish', 'Por platillo']].map(function (o) {
+          return el('button', { type: 'button', 'aria-pressed': S.shopView === o[0], onclick: function () { S.shopView = o[0]; render(); }, text: o[1] });
+        })),
+        el('div', { class: 'row' }, [
+          el('button', { class: 'btn', type: 'button', onclick: function () { copyText(shopText(p, list), 'Lista copiada'); } }, [icon('copy'), 'Copiar lista']),
+          el('button', { class: 'btn', type: 'button', onclick: function () { CAT_NAMES.forEach(function (c) { S.shopMore[c] = true; }); render(); window.print(); } }, [icon('print'), 'Imprimir'])
+        ])
+      ]));
+      main.appendChild(el('h2', { class: 'print-only', text: 'Lista de compras' }));
+      main.appendChild(S.shopView === 'dish' ? dishGrid(p) : catGrid(p, list));
+    }
+    main.appendChild(bottomNav(p, 3, 5, { disabled: !ready }));
+    if (!ready) main.appendChild(el('p', { class: 'hint noprint', style: 'text-align:right;margin-top:-12px', text: 'Compartir se activa cuando la IA ya revisó la lista de compras.' }));
+  }
+
+  /* ---------- paso 5: compartir ---------- */
+  var DEFAULT_MSG = 'Hola, te comparto tu plan de alimentación de Mi Plan Sarenti. Guarda esta imagen y en la app elige “Adjuntar corazón digital”.';
+  function step5(main, p) {
     if (shopPending(p).length) {   // por si se llega aquí sin pasar por goQR
-      main.appendChild(el('p', { class: 'err', role: 'alert', text: 'Antes de generar el QR, revisa la lista de compras.' }));
-      main.appendChild(el('button', { class: 'btn primary', onclick: function () { goQR(p); }, text: 'Ir a la lista de compras' }));
+      main.appendChild(el('section', { class: 'card stack' }, [el('p', { class: 'err', role: 'alert', text: 'Antes de compartir, genera la lista de compras.' }),
+        el('div', null, [el('button', { class: 'btn primary', type: 'button', onclick: function () { goStep(p, 4); }, text: 'Ir a la lista de compras' })])]));
       return;
     }
-    main.appendChild(el('div', { class: 'row noprint', style: 'margin:8px 0' }, [el('button', { class: 'btn small', onclick: function () { S.view = 'edit'; render(); focusMain(); }, text: '← Volver al plan' })]));
-    var holder = el('div', { class: 'qrbox' }, [el('p', { class: 'muted', text: 'Generando…' })]);
-    main.appendChild(holder);
+    var pc = main.querySelector('.pcard'); if (pc) pc.classList.add('noprint');
+    var share = el('div', { class: 'share' }, [el('section', { class: 'card qrc' }, [el('p', { class: 'muted', text: 'Generando…' })])]);
+    main.append(share, bottomNav(p, 4, 0));
+    var name = p.name || 'Paciente';
     var fontReady = document.fonts ? document.fonts.load('700 20px "Cormorant Garamond"').catch(function () {}) : null;
     /* Primero el código v1 (lo leen todas las versiones de la app); si no cabe en un QR, el v2, más compacto. */
     function encodeQR() {
@@ -758,67 +1220,81 @@
     }
     Promise.all([encodeQR(), fontReady]).then(function (r) {
       var code = r[0][0], res = r[0][1];
-      show();
-      function show() {
-        if (!res) { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: 'Este plan es demasiado largo para el corazón. Acorta algunos textos del plan.' })); return; }
-        var wrap = el('div'); wrap.innerHTML = qrSvg(res.q, p.name || 'Paciente');
-        /* Zoom: el QR a pantalla completa para que el paciente lo escanee del monitor o del celular. */
-        function zoom() {
-          var big = el('div', { class: 'zoom-qr' }); big.innerHTML = qrSvg(res.q, p.name || 'Paciente');
-          var dlg = el('dialog', { class: 'zoom', 'aria-label': 'Código QR en grande' }, [
-            el('button', { class: 'btn primary', type: 'button', onclick: function () { dlg.close(); }, text: '← Atrás' }), big]);
-          dlg.addEventListener('close', function () { dlg.remove(); });
-          document.body.appendChild(dlg); dlg.showModal();
-        }
-        holder.replaceChildren(wrap.firstChild, el('p', { class: 'hint', text: 'Muéstralo en la pantalla o imprímelo. El paciente lo escanea con Mi Plan Sarenti.' }),
-          el('button', { class: 'btn primary noprint', type: 'button', onclick: zoom, text: 'Zoom' }));
-        /* Mensaje y código van separados para mandarlos en dos mensajes de WhatsApp. */
-        function copy(box, done) {
-          (navigator.clipboard ? navigator.clipboard.writeText(box.value) : Promise.reject()).then(function () { toast(done); }, function () { box.focus(); box.select(); toast('Selecciona y copia el texto'); });
-        }
-        var mbox = el('textarea', { 'aria-label': 'Mensaje para WhatsApp', style: 'min-height:80px' });
-        mbox.value = 'Hola, te comparto tu plan de alimentación de Mi Plan Sarenti. En el siguiente mensaje va tu código: cópialo completo y en la app elige “Código manual”.';
-        /* "Copiar corazón": la imagen queda en el portapapeles para pegarla en el chat de WhatsApp. Se prepara antes
-           y se le pasa a ClipboardItem como promesa, porque Safari solo deja copiar justo al tocar el botón. */
-        var pngBlob = new Promise(function (ok) { qrPng(res.q, p.name || 'Paciente').toBlob(ok, 'image/png'); });
-        function copyPng() {
-          if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem === 'undefined') return toast('Este navegador no puede copiar imágenes. Usa “Descargar corazón (PNG)”.');
-          navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]).then(function () { toast('Corazón copiado: pégalo en WhatsApp'); },
-            function () { toast('No se pudo copiar. Usa “Descargar corazón (PNG)”.'); });
-        }
-        var ta = el('textarea', { readonly: true, 'aria-label': 'Código del plan', onfocus: function (e) { e.target.select(); } }); ta.value = code;
-        main.appendChild(el('div', { class: 'sub noprint', text: 'Mensaje' }));
-        main.appendChild(el('p', { class: 'hint noprint', text: 'Para pacientes que lo reciben por WhatsApp en lugar de escanear. Mándalo primero; puedes cambiar el texto.' }));
-        main.appendChild(mbox);
-        main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [el('button', { class: 'btn primary', onclick: function () { copy(mbox, 'Mensaje copiado'); }, text: 'Copiar mensaje' })]));
-        main.appendChild(el('div', { class: 'sub noprint', text: 'Código manual' }));
-        main.appendChild(el('p', { class: 'hint noprint', text: 'Mándalo en un mensaje aparte, sin cambiarlo.' }));
-        main.appendChild(ta);
-        main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [el('button', { class: 'btn primary', onclick: function () { copy(ta, 'Código copiado'); }, text: 'Copiar código' })]));
-        main.appendChild(el('div', { class: 'row noprint', style: 'margin:10px 0' }, [
-          el('button', { class: 'btn', onclick: copyPng, text: 'Copiar corazón' }),
-          el('button', { class: 'btn', onclick: function () { qrPng(res.q, p.name || 'Paciente').toBlob(function (b) { download(b, 'plan-' + slug(p.name) + '.png'); }); }, text: 'Descargar corazón (PNG)' }),
-          el('button', { class: 'btn', onclick: function () { window.print(); }, text: 'Imprimir' })
-        ]));
-        main.appendChild(el('p', { class: 'hint noprint', text: '“Copiar corazón” copia la imagen: abre el chat del paciente en WhatsApp y pégala. El paciente la guarda y en la app elige “Adjuntar corazón digital”.' }));
-        main.appendChild(el('p', { class: 'hint noprint', text: 'Tamaño del código: ' + code.length + ' caracteres (nivel de corrección ' + res.level + ').' }));
+      if (!res) { share.replaceChildren(el('section', { class: 'card' }, [el('p', { class: 'err', role: 'alert', text: 'Este plan es demasiado largo para el corazón. Acorta algunos textos del plan.' })])); return; }
+      function svgEl(id) { var w = el('div'); w.innerHTML = qrSvg(res.q, name, id); return w.firstChild; }
+      /* Pantalla completa: el QR grande para que el paciente lo escanee del monitor o del celular. */
+      function zoom() {
+        var dlg = el('dialog', { class: 'zoom', 'aria-label': 'Código QR en grande' }, [
+          el('button', { class: 'btn primary', type: 'button', onclick: function () { dlg.close(); } }, [icon('left'), 'Atrás']), el('div', { class: 'zoom-qr' }, [svgEl('z')])]);
+        dlg.addEventListener('close', function () { dlg.remove(); });
+        document.body.appendChild(dlg); dlg.showModal();
       }
-    }, function () { holder.replaceChildren(el('p', { class: 'err', role: 'alert', text: 'Este navegador no puede generar el código. Usa una versión reciente de Chrome, Edge, Safari o Firefox.' })); });
+      /* "Copiar corazón": la imagen queda en el portapapeles para pegarla en el chat de WhatsApp. Se prepara antes
+         y se le pasa a ClipboardItem como promesa, porque Safari solo deja copiar justo al tocar el botón. */
+      var pngBlob = new Promise(function (ok) { qrPng(res.q, name).toBlob(ok, 'image/png'); });
+      function copyPng() {
+        if (!navigator.clipboard || !navigator.clipboard.write || typeof ClipboardItem === 'undefined') return toast('Este navegador no puede copiar imágenes. Usa “Descargar PNG”.');
+        navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]).then(function () { toast('Corazón copiado: pégalo en WhatsApp'); },
+          function () { toast('No se pudo copiar. Usa “Descargar PNG”.'); });
+      }
+      var left = el('section', { class: 'card qrc' }, [
+        el('div', { class: 'head-t noprint' }, [el('h2', { text: 'En consulta' }), el('p', { class: 'muted', style: 'font-size:15px', text: 'El paciente lo escanea con la app Mi Plan Sarenti.' })]),
+        svgEl('a'),
+        el('div', { class: 'row noprint', style: 'justify-content:center' }, [
+          el('button', { class: 'btn primary', type: 'button', onclick: zoom }, [icon('expand'), 'Pantalla completa']),
+          el('button', { class: 'btn', type: 'button', onclick: function () { window.print(); } }, [icon('print'), 'Imprimir']),
+          el('button', { class: 'btn', type: 'button', onclick: function () { qrPng(res.q, name).toBlob(function (b) { download(b, 'plan-' + slug(p.name) + '.png'); }); } }, [icon('download'), 'Descargar PNG'])
+        ])
+      ]);
+      /* WhatsApp en un solo envío: la imagen del corazón con el mensaje como pie de foto. */
+      if (S.msg === null) S.msg = DEFAULT_MSG;
+      var txt = el('div', { class: 'tx', text: S.msg });
+      var ed = el('textarea', { 'aria-label': 'Mensaje para WhatsApp', hidden: !S.editMsg, style: 'min-height:96px', oninput: function (e) { S.msg = e.target.value; txt.textContent = S.msg; } });
+      ed.value = S.msg;
+      var edBtn = el('button', { class: 'btn small', type: 'button', 'aria-expanded': String(!!S.editMsg), text: S.editMsg ? 'Listo' : 'Editar texto', onclick: function () {
+        S.editMsg = !S.editMsg; ed.hidden = !S.editMsg; edBtn.textContent = S.editMsg ? 'Listo' : 'Editar texto'; edBtn.setAttribute('aria-expanded', String(S.editMsg)); if (S.editMsg) ed.focus();
+      } });
+      var right = el('section', { class: 'card wac noprint' }, [
+        el('div', { class: 'head-t', style: 'padding-bottom:6px' }, [el('h2', { text: 'Por WhatsApp' }), el('p', { class: 'muted', style: 'font-size:15px', text: 'El corazón y el mensaje van juntos, en un solo envío.' })]),
+        el('div', { class: 'bub' }, [el('div', { class: 'img', 'aria-hidden': 'true' }, [svgEl('b')]), txt]),
+        el('div', { class: 'stp' }, [el('span', { class: 'num', text: '1' }), el('div', { class: 'bd' }, [
+          el('span', { class: 'tt', text: 'Copia el corazón y pégalo en el chat' }),
+          el('div', null, [el('button', { class: 'btn primary', type: 'button', onclick: copyPng }, [icon('heart'), 'Copiar corazón'])])
+        ])]),
+        el('div', { class: 'stp', style: 'border-bottom:0' }, [el('span', { class: 'num', text: '2' }), el('div', { class: 'bd' }, [
+          el('div', { class: 'row', style: 'justify-content:space-between' }, [el('span', { class: 'tt', text: 'Escribe el mensaje como pie de la imagen' }), edBtn]),
+          ed,
+          el('div', null, [el('button', { class: 'btn primary', type: 'button', onclick: function () { copyText(S.msg, 'Mensaje copiado'); } }, [icon('copy'), 'Copiar mensaje'])])
+        ])]),
+        el('div', { class: 'planb' }, [
+          el('span', { style: 'font-weight:500;font-size:14px;color:var(--muted)', text: '¿No se pudo abrir la imagen? Usa el código manual' }),
+          el('div', { class: 'code', title: code, text: code }),
+          el('div', { class: 'row', style: 'gap:12px' }, [
+            el('button', { class: 'btn small', type: 'button', onclick: function () { copyText(code, 'Código copiado'); }, text: 'Copiar código' }),
+            el('span', { class: 'muted', style: 'font-size:13px', text: 'Mándalo solo, sin cambiarlo. En la app: “Código manual”.' })
+          ]),
+          el('span', { class: 'hint', style: 'font-size:13px', text: 'Tamaño del código: ' + code.length + ' caracteres (nivel de corrección ' + res.level + ').' })
+        ])
+      ]);
+      share.replaceChildren(left, right);
+    }, function () { share.replaceChildren(el('section', { class: 'card' }, [el('p', { class: 'err', role: 'alert', text: 'Este navegador no puede generar el código. Usa una versión reciente de Chrome, Edge, Safari o Firefox.' })])); });
   }
 
   /* ---------- respaldo ---------- */
+  function downloadBackup() {
+    var data = { app: 'planes-sarenti', v: 1, exported: nowSec(), plans: plans, templates: templates };
+    download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'sarenti-respaldo-' + new Date().toISOString().slice(0, 10) + '.json');
+    toast('Respaldo descargado');
+  }
   function buildBackup(main) {
-    main.appendChild(el('h2', { text: 'Respaldo', style: 'margin:12px 0' }));
-    main.appendChild(el('div', { class: 'card' }, [
-      el('h3', { text: 'Guardar un respaldo' }),
-      el('p', { class: 'hint', text: 'Descarga un archivo con todos tus planes y plantillas. Sirve para no perder nada y para pasar los planes a otro dispositivo. Contiene datos de pacientes: guárdalo en un lugar seguro.' }),
-      el('button', { class: 'btn primary', onclick: function () {
-        var data = { app: 'planes-sarenti', v: 1, exported: nowSec(), plans: plans, templates: templates };
-        download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'sarenti-respaldo-' + new Date().toISOString().slice(0, 10) + '.json');
-      }, text: 'Descargar respaldo' })
+    main.appendChild(hero('Respaldo', 'Respaldo y privacidad', 'Los planes viven solo en este dispositivo. Guarda una copia para no perderlos o para pasarlos a otro equipo.'));
+    main.appendChild(el('section', { class: 'card stack', style: 'gap:14px' }, [
+      el('h2', { text: 'Guardar un respaldo', style: 'font-size:24px' }),
+      el('p', { class: 'muted', style: 'font-size:15px', text: 'Descarga un archivo con todos tus planes y plantillas. Contiene datos de pacientes: guárdalo en un lugar seguro.' }),
+      el('div', null, [el('button', { class: 'btn primary', type: 'button', onclick: downloadBackup }, [icon('download'), 'Descargar respaldo'])])
     ]));
     var msg = el('p', { role: 'status' });
-    var file = el('input', { type: 'file', accept: '.json,application/json', 'aria-label': 'Archivo de respaldo', onchange: function (e) {
+    var file = el('input', { type: 'file', id: 'bk-file', accept: '.json,application/json', onchange: function (e) {
       var f = e.target.files[0]; if (!f) return;
       f.text().then(function (t) {
         var d = JSON.parse(t); if (!d || d.app !== 'planes-sarenti' || !Array.isArray(d.plans)) throw 0;
@@ -828,26 +1304,29 @@
           if (!ex) { plans.push(np); added++; } else if ((np.updated || 0) > (ex.updated || 0)) { plans[plans.indexOf(ex)] = np; updated++; }
         });
         (d.templates || []).forEach(function (t2) { if (!templates.some(function (x) { return x.tplName === t2.tplName; })) templates.push(t2); });
-        persist(); fillList(document.getElementById('plist'));
-        msg.className = ''; msg.textContent = 'Listo: ' + added + ' planes nuevos y ' + updated + ' actualizados.';
+        persist(); render(); toast('Listo: ' + added + ' planes nuevos y ' + updated + ' actualizados.');
       }).catch(function () { msg.className = 'err'; msg.textContent = 'Ese archivo no es un respaldo de Planes Sarenti.'; });
     } });
-    main.appendChild(el('div', { class: 'card' }, [
-      el('h3', { text: 'Cargar un respaldo' }),
-      el('p', { class: 'hint', text: 'Une los planes del archivo con los de este dispositivo. Si un plan está en los dos, se queda el más reciente.' }),
-      file, msg
+    main.appendChild(el('section', { class: 'card stack', style: 'gap:14px' }, [
+      el('h2', { text: 'Cargar un respaldo', style: 'font-size:24px' }),
+      el('p', { class: 'muted', style: 'font-size:15px', text: 'Une los planes del archivo con los de este dispositivo. Si un plan está en los dos, se queda el más reciente.' }),
+      el('div', { class: 'fld' }, [el('label', { for: 'bk-file', class: 'lbl', text: 'Archivo de respaldo (.json)' }), file]), msg
     ]));
-    main.appendChild(el('div', { class: 'card' }, [
-      el('h3', { text: 'PIN y privacidad' }),
-      el('p', { class: 'hint', text: 'El PIN evita que alguien abra la herramienta por casualidad. Los datos no están cifrados: protege también el dispositivo con su propio bloqueo de pantalla.' }),
+    main.appendChild(el('section', { class: 'card stack', style: 'gap:14px' }, [
+      el('h2', { text: 'PIN y privacidad', style: 'font-size:24px' }),
+      el('p', { class: 'muted', style: 'font-size:15px', text: 'El PIN evita que alguien abra la herramienta por casualidad. Los datos no están cifrados: protege también el dispositivo con su propio bloqueo de pantalla.' }),
       el('div', { class: 'row' }, [
-        el('button', { class: 'btn', onclick: function () { var a = prompt('PIN actual:'); if (a === null) return; var d = lsGet(K_PIN); hashPin(a, d.salt).then(function (h) { if (h !== d.hash) return toast('PIN incorrecto'); lsDel(K_PIN); unlocked = false; render(); }); }, text: 'Cambiar PIN' }),
-        el('button', { class: 'btn danger', onclick: function () { if (confirm('Se borrarán TODOS los planes y plantillas de este dispositivo. ¿Seguro?') && confirm('Última confirmación: ¿ya descargaste un respaldo?')) { lsDel(K_PLANS); lsDel(K_TPL); plans = []; templates = []; S.view = 'none'; render(); } }, text: 'Borrar todo' })
+        el('button', { class: 'btn', type: 'button', onclick: function () { var a = prompt('PIN actual:'); if (a === null) return; var d = lsGet(K_PIN); hashPin(a, d.salt).then(function (h) { if (h !== d.hash) return toast('PIN incorrecto'); lsDel(K_PIN); unlocked = false; render(); }); }, text: 'Cambiar PIN' }),
+        el('button', { class: 'btn danger', type: 'button', onclick: function () { if (confirm('Se borrarán TODOS los planes y plantillas de este dispositivo. ¿Seguro?') && confirm('Última confirmación: ¿ya descargaste un respaldo?')) { lsDel(K_PLANS); lsDel(K_TPL); plans = []; templates = []; go('home'); } }, text: 'Borrar todo' })
       ])
     ]));
   }
 
   /* ---------- inicio ---------- */
+  /* El menú "Más" se cierra al tocar fuera o con Escape. */
+  function closeMenus(e) { document.querySelectorAll('details.more[open]').forEach(function (d) { if (!e || e.type === 'keydown' || !d.contains(e.target)) d.open = false; }); }
+  document.addEventListener('click', closeMenus);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenus(e); });
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {});
   window.addEventListener('beforeunload', function () { if (!saved) persist(); });
   if (lsGet(K_PIN)) loadAll();
