@@ -431,7 +431,7 @@
   }
   function goStep(p, k) {
     if (k === 5) return goQR(p);
-    S.step = k; S.copyOpen = false; S.paste = false; S.timeEdit = -1;
+    S.step = k; S.copyOpen = false; S.paste = false; S.timeEdit = -1; S.showPrompt = false;
     if (k === 1) S.part = partOneDone(p) ? 'ia' : 'datos';
     render(); focusMain();
   }
@@ -558,41 +558,49 @@
       el('button', { class: 'btn', type: 'button', onclick: function () { S.part = 'datos'; render(); focusMain(); }, text: 'Editar datos' })
     ]));
 
+    main.appendChild(aiCard({
+      eyebrow: 'Parte 2 de 2', title: 'Llenar los 7 días con IA', sub: 'Dos pasos y el plan queda listo para revisar.',
+      prompt: function () { return aiPrompt(d); }, id: 'resp', applyLabel: 'Poner en el plan', applyNote: 'Reemplaza las comidas de los 7 días.',
+      apply: function (text) {
+        var days = parseAI(text);
+        if (hasMeals(p) && !confirm('Se reemplazarán las comidas de los 7 días de este plan. ¿Continuar?')) return;
+        applyAI(p, days); resetShop(p); touch(); persist();
+        S.step = 2; S.day = 0; render(); focusMain(); toast('Listo. Revisa y ajusta cada día.');
+      }
+    }));
+    main.appendChild(bottomNav(p, 0, 2, { plain: true }));
+  }
+  /* El mismo cuadro de IA en "Datos e IA" y en "Lista de compras": copiar instrucciones (o verlas) y pegar la respuesta. */
+  function aiCard(o) {
     var shown = el('textarea', { readonly: true, 'aria-label': 'Instrucciones para la IA', hidden: !S.showPrompt, style: 'min-height:220px', onfocus: function (e) { e.target.select(); } });
-    if (S.showPrompt) shown.value = aiPrompt(d);
-    var view = el('button', { class: 'link', type: 'button', 'aria-expanded': String(S.showPrompt), text: S.showPrompt ? 'Ocultar instrucciones' : 'Ver instrucciones', onclick: function () { setShown(!S.showPrompt); } });
+    if (S.showPrompt) shown.value = o.prompt();
+    var view = el('button', { class: 'link', type: 'button', 'aria-expanded': String(!!S.showPrompt), text: S.showPrompt ? 'Ocultar instrucciones' : 'Ver instrucciones', onclick: function () { setShown(!S.showPrompt); } });
     function setShown(on) {
-      S.showPrompt = on; shown.hidden = !on; if (on) shown.value = aiPrompt(d);
+      S.showPrompt = on; shown.hidden = !on; if (on) shown.value = o.prompt();
       view.textContent = on ? 'Ocultar instrucciones' : 'Ver instrucciones'; view.setAttribute('aria-expanded', String(on));
     }
-    var ta = el('textarea', { id: 'resp', class: 'paste', rows: '5', placeholder: 'Pega aquí la respuesta completa' });
+    var ta = el('textarea', { id: o.id, class: 'paste', rows: '5', placeholder: 'Pega aquí la respuesta completa' });
     var msg = el('p', { class: 'err', role: 'alert' });
-    function apply() {
-      msg.textContent = '';
-      var days; try { days = parseAI(ta.value); } catch (e) { msg.textContent = e.message; return; }
-      if (hasMeals(p) && !confirm('Se reemplazarán las comidas de los 7 días de este plan. ¿Continuar?')) return;
-      applyAI(p, days); resetShop(p); touch(); persist();
-      S.step = 2; S.day = 0; render(); focusMain(); toast('Listo. Revisa y ajusta cada día.');
-    }
-    main.appendChild(el('section', { class: 'card focus stack', style: 'gap:24px' }, [
-      el('span', { class: 'eb', style: 'margin-bottom:-12px', text: 'Parte 2 de 2' }),
-      titleIc('spark', 'Llenar los 7 días con IA', 'Dos pasos y el plan queda listo para revisar.'),
+    function apply() { msg.textContent = ''; try { o.apply(ta.value); } catch (e) { msg.textContent = e.message; } }
+    return el('section', { class: 'card focus stack noprint', style: 'gap:24px' }, [
+      el('span', { class: 'eb', style: 'margin-bottom:-12px', text: o.eyebrow }),
+      titleIc('spark', o.title, o.sub),
+      o.warn || null,
       el('ol', { class: 'vsteps' }, [
         vstep(1, 'Copia las instrucciones', 'Pégalas en tu asistente de IA y espera a que termine de responder.', [
           el('div', { class: 'row' }, [el('button', { class: 'btn primary', type: 'button', onclick: function () {
-            var t = aiPrompt(d);
-            copyText(t, 'Instrucciones copiadas', function () { setShown(true); shown.focus(); toast('Selecciona y copia las instrucciones'); });
+            copyText(o.prompt(), 'Instrucciones copiadas', function () { setShown(true); shown.focus(); toast('Selecciona y copia las instrucciones'); });
           } }, [icon('copy'), 'Copiar instrucciones']), view]),
           shown
         ]),
         vstep(2, 'Pega la respuesta', 'Copia todo lo que respondió y pégalo aquí.', [ta, msg,
-          el('div', { class: 'row', style: 'gap:14px' }, [el('button', { class: 'btn primary', type: 'button', onclick: apply, text: 'Poner en el plan' }),
-            el('span', { class: 'hint row', style: 'gap:8px' }, [icon('info'), 'Reemplaza las comidas de los 7 días.'])])
-        ], true, 'resp')
+          el('div', { class: 'row', style: 'gap:14px' }, [el('button', { class: 'btn primary', type: 'button', onclick: apply, text: o.applyLabel }),
+            o.cancel ? el('button', { class: 'btn', type: 'button', onclick: o.cancel, text: 'Cancelar' }) : null,
+            el('span', { class: 'hint row', style: 'gap:8px' }, [icon('info'), o.applyNote])])
+        ], true, o.id)
       ]),
       el('div', { class: 'note' }, [icon('lock'), 'Las instrucciones no incluyen el nombre del paciente.'])
-    ]));
-    main.appendChild(bottomNav(p, 0, 2, { plain: true }));
+    ]);
   }
 
   /* ---------- paso 2: comidas por día ---------- */
@@ -890,7 +898,7 @@
   /* Nunca hay QR sin la lista de compras revisada (el botón está desactivado; esto es por si acaso). */
   function goQR(p) {
     cleanPlan(p); touch(); persist();
-    S.copyOpen = false; S.paste = false; S.timeEdit = -1;
+    S.copyOpen = false; S.paste = false; S.timeEdit = -1; S.showPrompt = false;
     if (shopPending(p).length) { S.step = 4; render(); focusMain(); toast('Antes de compartir, genera la lista de compras'); return; }
     S.step = 5; render(); focusMain();
   }
@@ -1120,26 +1128,19 @@
     });
     return grid;
   }
-  function shopPaste(p, lines) {
-    var ta = el('textarea', { id: 'shop-resp', class: 'paste', rows: '5', placeholder: 'Pega aquí la respuesta completa' });
-    var msg = el('p', { class: 'err', role: 'alert' });
-    var btn = el('button', { class: 'btn primary', type: 'button', text: 'Guardar lista', onclick: function () {
-      msg.textContent = '';
-      var r; try { r = parseShopAI(ta.value, lines); } catch (e) { msg.textContent = e.message; return; }
-      /* Se suma a lo ya revisado: si la IA dejó fuera renglones, siguen pendientes y no se puede compartir todavía. */
-      p.shop = Object.assign({}, p.shop, r); touch(); persist(); S.paste = false;
-      var left = shopPending(p).length;
-      toast(left ? 'Faltan ' + left + (left === 1 ? ' renglón' : ' renglones') + ' por revisar' : 'Lista de compras lista');
-      render();
-    } });
-    return { ta: ta, msg: msg, btn: btn };
-  }
-  function copyShopPrompt(lines, ta) {
-    var t = shopPrompt(lines);
-    copyText(t, 'Instrucciones copiadas', function () {
-      if (!ta) return toast('Este navegador no dejó copiar.');
-      ta.value = t; ta.focus(); ta.select(); toast('Selecciona y copia las instrucciones');
-    });
+  function shopCard(p, lines, o) {
+    return aiCard(Object.assign({
+      eyebrow: 'Lista de compras', title: 'Generar la lista con IA', sub: 'Dos pasos y la lista queda agrupada por categoría, con las cantidades sumadas.',
+      prompt: function () { return shopPrompt(lines); }, id: 'shop-resp', applyLabel: 'Poner en la lista', applyNote: 'La IA solo recibe los alimentos del plan.',
+      apply: function (text) {
+        var r = parseShopAI(text, lines);
+        /* Se suma a lo ya revisado: si la IA dejó fuera renglones, siguen pendientes y no se puede compartir todavía. */
+        p.shop = Object.assign({}, p.shop, r); touch(); persist(); S.paste = false; S.showPrompt = false;
+        var left = shopPending(p).length;
+        toast(left ? 'Faltan ' + left + (left === 1 ? ' renglón' : ' renglones') + ' por revisar' : 'Lista de compras lista');
+        render();
+      }
+    }, o));
   }
   function step4(main, p) {
     var lines = planLines(p), pending = shopPending(p), ready = lines.length > 0 && !pending.length;
@@ -1152,34 +1153,19 @@
       main.appendChild(bottomNav(p, 3, 0)); return;
     }
     if (!ready) {
-      var x = shopPaste(p, lines), partial = pending.length < lines.length;
-      main.appendChild(el('section', { class: 'card focus stack', style: 'gap:24px' }, [
-        titleIc('spark', 'Generar la lista con IA', 'La IA dice qué se compra de cada alimento. Aquí se agrupa por categoría y se suman las cantidades.'),
-        partial ? el('div', { class: 'banner warn', role: 'status' }, [el('span', null, [icon('alert', 20),
-          pending.length + ' de ' + lines.length + (lines.length === 1 ? ' renglón' : ' renglones') + ' sin revisar (la IA no los incluyó): ' + pending.join(' · ') + '. Repite los dos pasos.'])]) : null,
-        el('ol', { class: 'vsteps' }, [
-          vstep(1, 'Copia las instrucciones', 'Llevan solo los alimentos del plan. Pégalas en tu asistente de IA.', [
-            el('div', { class: 'row' }, [el('button', { class: 'btn primary', type: 'button', onclick: function () { copyShopPrompt(lines, x.ta); } }, [icon('copy'), 'Copiar instrucciones'])])
-          ]),
-          vstep(2, 'Pega la respuesta', 'Copia todo lo que respondió y pégalo aquí.', [x.ta, x.msg, el('div', { class: 'row' }, [x.btn])], true, 'shop-resp')
-        ]),
-        el('div', { class: 'note' }, [icon('lock'), 'Las instrucciones no incluyen el nombre del paciente.'])
-      ]));
+      var partial = pending.length < lines.length;
+      main.appendChild(shopCard(p, lines, { warn: partial ? el('div', { class: 'banner warn', role: 'status' }, [el('span', null, [icon('alert', 20),
+        pending.length + ' de ' + lines.length + (lines.length === 1 ? ' renglón' : ' renglones') + ' sin revisar (la IA no los incluyó): ' + pending.join(' · ') + '. Repite los dos pasos.'])]) : null }));
     } else {
-      var y = S.paste ? shopPaste(p, lines) : null, list = shopList(p);
-      main.appendChild(el('div', { class: 'banner noprint' }, [
-        el('span', null, [icon('spark', 20), el('span', null, ['Lista generada con IA. ', el('span', { class: 'muted', text: '¿Quieres rehacerla?' })])]),
-        el('div', { class: 'row' }, [
-          el('button', { class: 'btn', type: 'button', onclick: function () { copyShopPrompt(lines, y && y.ta); }, text: 'Copiar instrucciones' }),
-          el('button', { class: 'btn', type: 'button', 'aria-expanded': String(!!S.paste), onclick: function () {
-            S.paste = !S.paste; render(); if (S.paste) setTimeout(function () { var t = document.getElementById('shop-resp'); if (t) t.focus(); }, 0);
-          }, text: 'Pegar respuesta nueva' })
-        ])
+      var list = shopList(p);
+      /* Como "Parte 1 · Datos del paciente listos": tarjeta con palomita y el botón para rehacer. */
+      main.appendChild(el('section', { class: 'card pcard noprint', style: 'padding:18px 24px' }, [
+        el('div', { class: 'who', style: 'gap:14px' }, [el('span', { class: 'done-ic', 'aria-hidden': 'true' }, [icon('check', 18)]),
+          el('div', { class: 'head-t', style: 'gap:6px;min-width:0' }, [el('span', { style: 'font-weight:600;font-size:17px', text: 'Lista de compras generada con IA' }),
+            el('span', { class: 'muted', style: 'font-size:14px', text: list.length + (list.length === 1 ? ' ingrediente' : ' ingredientes') + ' para los 7 días' })])]),
+        el('button', { class: 'btn', type: 'button', 'aria-expanded': String(!!S.paste), onclick: function () { S.paste = !S.paste; S.showPrompt = false; render(); }, text: S.paste ? 'Cancelar' : 'Rehacer con IA' })
       ]));
-      if (y) main.appendChild(el('section', { class: 'card stack noprint', style: 'gap:12px' }, [
-        el('label', { for: 'shop-resp', style: 'font-weight:600;font-size:17px', text: 'Pega la respuesta nueva' }), y.ta, y.msg,
-        el('div', { class: 'row' }, [y.btn, el('button', { class: 'btn', type: 'button', onclick: function () { S.paste = false; render(); }, text: 'Cancelar' })])
-      ]));
+      if (S.paste) main.appendChild(shopCard(p, lines, { eyebrow: 'Rehacer la lista', cancel: function () { S.paste = false; S.showPrompt = false; render(); } }));
       main.appendChild(el('div', { class: 'row noprint', style: 'justify-content:space-between;gap:12px' }, [
         el('div', { class: 'seg', role: 'group', 'aria-label': 'Ver lista' }, [['cat', 'Por categoría'], ['dish', 'Por platillo']].map(function (o) {
           return el('button', { type: 'button', 'aria-pressed': S.shopView === o[0], onclick: function () { S.shopView = o[0]; render(); }, text: o[1] });
