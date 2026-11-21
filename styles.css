@@ -116,9 +116,6 @@ textarea.paste{border-style:dashed;border-width:1.5px;border-color:var(--dash)}
 .tile.primary:hover{background:var(--plum-d)}
 .tile.primary .ic{background:rgba(255,255,255,.16);color:#fff}
 .tile.primary .ds{color:var(--rose)}
-.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px}
-.how div{display:flex;gap:14px;align-items:flex-start;font-size:15px;line-height:1.5;color:var(--plum-d)}
-.how strong{color:var(--ink)}
 .n32{flex:none;width:32px;height:32px;border-radius:50%;border:1.5px solid var(--plum);color:var(--plum);display:flex;align-items:center;justify-content:center;font-weight:600}
 
 /* ficha del paciente */
@@ -268,7 +265,6 @@ textarea.paste{border-style:dashed;border-width:1.5px;border-color:var(--dash)}
 .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.5;color:var(--plum-d);background:var(--rose2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 
 /* nuevo plan, escáner y respaldo */
-.scan{display:block;width:100%;max-width:420px;margin:0 0 10px;border-radius:14px;background:#000}
 .tpl{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--row)}
 .tpl strong{flex:1;min-width:0}
 input[type=file]{font-size:15px}
@@ -318,6 +314,30 @@ input[type=file]{font-size:15px}
   .stepnav{flex-direction:column-reverse;align-items:stretch}
   .stepnav .btn{width:100%}
 }
+/* paso 5: el plan completo */
+.plansum{display:flex;flex-direction:column;gap:20px;margin-top:20px}
+.ps-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+.ps-tab{border-collapse:collapse;width:100%;min-width:900px;font-size:14px;line-height:1.45}
+.ps-tab th,.ps-tab td{border-bottom:1px solid var(--line);border-left:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}
+.ps-tab th:first-child,.ps-tab td:first-child{border-left:0}
+.ps-tab tbody tr:last-child>*{border-bottom:0}
+.ps-tab thead th{background:var(--rose);color:var(--plum-d);font-weight:600}
+.ps-tab .ml{width:110px;font-weight:600;color:var(--plum-d)}
+.ps-tab .ml small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.ps-tab tr.snack>*{background:var(--rose2)}
+.ps-tab td strong{display:block;color:var(--ink);margin-bottom:2px}
+.ps-tab td em{display:block;font-style:normal;font-size:12px;color:var(--muted)}
+.ps-tab ul{margin:0;padding:0 0 0 16px}
+.ps-tab .none{color:var(--ph)}
+.inds{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.ind{border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.ind h3{display:flex;align-items:center;gap:8px;font-family:Jost,sans-serif;font-size:15px;font-weight:600;color:var(--plum-d);margin:0 0 8px}
+.ind ul{margin:0;padding:0 0 0 18px;line-height:1.6;font-size:14px}
+.ind p{margin:0;font-size:14px}
+.ps-top{align-items:center;gap:16px;border-bottom:2px solid var(--plum);padding-bottom:10px}
+.ps-top img{height:44px;width:auto}
+.ps-top h1{font-size:26px;margin:0}
+.ps-top p{margin:0;color:var(--muted)}
 @media print{
   body{background:#fff}
   .noprint,.hd,.panel,.rail{display:none!important}
@@ -326,6 +346,21 @@ input[type=file]{font-size:15px}
   .print-only{display:block}
   .cats{display:block}
   .cat{break-inside:avoid;margin-bottom:16px}
+  /* "Imprimir" del corazón no lleva el plan; "Descargar PDF" lleva solo el plan, en horizontal. */
+  body:not(.print-plan) .plansum{display:none}
+  body.print-plan .wrap>*:not(main),body.print-plan main>*:not(.plansum){display:none!important}
+  body.print-plan .plansum{margin:0;page:plan}
+  .ps-top.print-only{display:flex}
+  .ps-scroll{overflow:visible;border-radius:0}
+  .ps-tab{min-width:0;font-size:10.5px;line-height:1.35}
+  .ps-tab th,.ps-tab td{padding:5px 6px}
+  .ps-tab tr{break-inside:avoid}
+  .ps-tab .ml{width:72px}
+  .inds{grid-template-columns:repeat(4,1fr);gap:10px;break-inside:avoid}
+  .ind{padding:8px 10px}
+  .ind ul,.ind p{font-size:11px}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+@page plan{size:landscape;margin:10mm}
 .pitem>svg{color:var(--plum)}
 .pitem .av{cursor:inherit}

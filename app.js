@@ -95,23 +95,9 @@
     var days = []; for (var i = 0; i < 7; i++) days.push(emptyMeals());
     return { id: uid(), name: name || '', updated: nowSec(), glasses: 8, daily: [], avoid: [], prep: [], days: days };
   }
-  function samplePlan() {
-    var p = blankPlan('Lucía Torres');
-    var desayunos = [['2 huevos', '1/3 de aguacate', '1 tortilla de maíz'], ['Licuado de proteína', '1 manzana'], ['Avena con canela', '1 puñito de nueces'], ['Omelette de espinacas', '1 tostada'], ['Yogurt natural', 'Fruta picada', 'Chía'], ['Huevo con chayote', '1 tortilla'], ['Quesadillas de queso panela', 'Salsa']];
-    var comidas = [['Pechuga de pollo', 'Ensalada', 'Arroz integral'], ['Bistec', 'Verduras al vapor'], ['Pescado al horno', 'Ensalada'], ['Caldo de pollo', 'Verduras'], ['Pechuga de pollo', 'Ensalada'], ['Sándwich integral', 'Jícama'], ['Caldo de pollo', 'Fruta']];
-    for (var d = 0; d < 7; d++) {
-      p.days[d][0].items = desayunos[d].slice();
-      p.days[d][1].items = ['1 fruta', '10 almendras'];
-      p.days[d][2].items = comidas[d].slice();
-      p.days[d][3].items = ['Yogurt natural'];
-      p.days[d][4].items = ['Ensalada de atún', '1 tostada'];
-    }
-    return p;
-  }
-
   /* ---------- estado ---------- */
   var plans = [], templates = [];
-  /* view: home | new | backup | plan. En un plan, step 1 a 5; el paso 1 tiene dos partes (datos | ia). */
+  /* view: home | plan. En un plan, step 1 a 5; el paso 1 tiene dos partes (datos | ia). */
   var S = { sel: null, view: 'home', step: 1, part: 'datos', day: 0, search: '', side: false };
   function resetUI() { S.side = false; S.copyOpen = false; S.timeEdit = -1; S.paste = false; S.showPrompt = false; S.msg = null; S.editMsg = false; S.shopView = 'cat'; S.shopMore = {}; }
   resetUI();
@@ -206,7 +192,6 @@
 
   /* ---------- armazón ---------- */
   function render() {
-    stopScan();
     if (!unlocked) return renderLock();
     var p = S.view === 'plan' ? cur() : null;
     if (S.view === 'plan' && !p) S.view = 'home';
@@ -214,8 +199,6 @@
     /* En Inicio la barra de pacientes se ve completa; en el plan empieza como riel angosto. */
     var side = S.view !== 'plan' || S.side ? buildPanel() : buildRail(p);
     if (S.view === 'home') buildHome(main);
-    else if (S.view === 'new') buildNew(main);
-    else if (S.view === 'backup') buildBackup(main);
     else buildPlan(main, p);
     app.replaceChildren(header(), el('div', { class: 'wrap' }, [side, main]));
   }
@@ -229,8 +212,6 @@
         el('span', { class: 't' }, [el('span', { class: 'eb', text: 'Sarenti' }), el('span', { class: 'serif', text: 'Planes de alimentación' })])
       ]),
       el('div', { class: 'acts' }, [
-        el('span', { class: 'chip' }, [icon('monitor', 16), 'Guardado solo en este dispositivo']),
-        el('button', { class: 'btn', type: 'button', onclick: function () { go('backup'); } }, [icon('download'), 'Respaldo']),
         el('button', { class: 'btn', type: 'button', onclick: lock }, [icon('lock'), 'Bloquear'])
       ])
     ])]);
@@ -247,13 +228,12 @@
           S.view === 'plan' ? el('button', { class: 'ib', type: 'button', 'aria-label': 'Ocultar barra lateral', title: 'Ocultar barra lateral', 'aria-expanded': 'true', onclick: function () { S.side = false; render(); } }, [icon('sidebarOff', 20)]) : null
         ])
       ]),
-      el('button', { class: 'big-new', type: 'button', onclick: function () { go('new'); } }, [icon('plus', 20), 'Nuevo plan']),
+      el('button', { class: 'big-new', type: 'button', onclick: function () { newPlan(null); } }, [icon('plus', 20), 'Nuevo plan']),
       el('div', { class: 'fld', style: 'gap:8px' }, [
         el('label', { for: 'buscar', class: 'lbl', text: 'Buscar paciente' }),
         el('div', { class: 'search' }, [icon('search'), el('input', { id: 'buscar', type: 'search', placeholder: 'Nombre o apellido', value: S.search, autocomplete: 'off', oninput: function (e) { S.search = e.target.value; fillList(list); } })])
       ]),
-      el('div', { class: 'fld', style: 'gap:8px' }, [el('span', { class: 'cap', text: 'Recientes' }), list]),
-      el('div', { class: 'tip' }, [icon('alert'), el('span', { text: 'Como los planes viven solo en este equipo, descarga un respaldo cada semana para no perderlos.' })])
+      el('div', { class: 'fld', style: 'gap:8px' }, [el('span', { class: 'cap', text: 'Recientes' }), list])
     ]);
     fillList(list);
     return panel;
@@ -274,7 +254,7 @@
   function buildRail(p) {
     return el('nav', { class: 'rail', 'aria-label': 'Barra lateral' }, [
       el('button', { class: 'ib2', type: 'button', 'aria-label': 'Mostrar barra lateral', title: 'Mostrar barra lateral', 'aria-expanded': 'false', onclick: function () { S.side = true; render(); } }, [icon('sidebar', 20)]),
-      el('button', { class: 'ib2 primary', type: 'button', 'aria-label': 'Nuevo plan', title: 'Nuevo plan', onclick: function () { go('new'); } }, [icon('plus', 20)]),
+      el('button', { class: 'ib2 primary', type: 'button', 'aria-label': 'Nuevo plan', title: 'Nuevo plan', onclick: function () { newPlan(null); } }, [icon('plus', 20)]),
       el('span', { class: 'sep', 'aria-hidden': 'true' }),
       el('button', { class: 'av', type: 'button', 'aria-label': 'Datos de ' + (p.name || 'este paciente'), title: p.name || 'Sin nombre', text: initials(p.name),
         onclick: function () { S.step = 1; S.part = 'datos'; render(); focusMain(); } })
@@ -301,17 +281,12 @@
     main.append(
       hero('Inicio', 'Bienvenida', '¿Qué quieres hacer hoy? Elige a un paciente de la lista o empieza un plan nuevo.'),
       el('div', { class: 'tiles' }, [
-        tile('file', 'Crear plan nuevo', 'Registra a un paciente y arma su plan de 7 días.', function () { go('new'); }, true),
+        tile('file', 'Crear plan nuevo', 'Registra a un paciente y arma su plan de 7 días.', function () { newPlan(null); }, true),
         last ? tile('clock', 'Continuar el último', (last.name || 'Sin nombre') + ' · ' + fmtDate(last.updated), function () { openPlan(last); }) : null,
-        tile('download', 'Hacer respaldo', 'Descarga una copia de todos los planes.', downloadBackup)
-      ]),
-      el('section', { class: 'card stack', style: 'padding:28px 32px' }, [
-        el('h2', { text: 'Cómo funciona', style: 'font-size:24px' }),
-        el('div', { class: 'how' }, [['Registra al paciente', 'Nombre y datos básicos.'], ['Arma su plan', 'Comidas día por día.'], ['Actualízalo', 'Ajusta el plan en cada consulta.']].map(function (h, i) {
-          return el('div', null, [el('span', { class: 'n32', text: String(i + 1) }), el('span', null, [el('strong', { text: h[0] }), el('br'), h[1]])]);
-        }))
+        tile('heart', 'Abrir un plan que ya tiene corazón', 'Sube la imagen de su corazón digital.', pickHeart)
       ])
     );
+    var tpl = templatesSection(); if (tpl) main.appendChild(tpl);
   }
 
   /* ---------- nuevo plan ---------- */
@@ -320,54 +295,33 @@
     S.step = step || 1; S.part = step ? 'ia' : 'datos';
     persist(); render(); focusMain();
   }
-  function buildNew(main) {
-    function make(base) {
-      var p = base ? clone(base) : blankPlan();
-      p.id = uid(); p.name = base && base.tplName ? '' : (p.name || ''); delete p.tplName; p.updated = nowSec();
-      addPlan(p);
+  /* "Nuevo plan" abre directo un plan en blanco; con una plantilla, el plan empieza con sus comidas. */
+  function newPlan(base) {
+    var p = base ? clone(base) : blankPlan();
+    p.id = uid(); p.name = base && base.tplName ? '' : (p.name || ''); delete p.tplName; p.updated = nowSec();
+    addPlan(p);
+  }
+  /* Abrir un plan desde la imagen de su corazón. Si el plan ya está en este dispositivo, se puede reemplazar. */
+  async function openHeartCode(text) {
+    var p = await SarentiCodec.decode(text), ex = plans.filter(function (x) { return x.id === p.id; })[0];
+    if (ex) {
+      if (confirm('Ya tienes el plan de ' + (ex.name || 'este paciente') + '. ¿Reemplazarlo con el del corazón?\n\nAceptar: reemplazar. Cancelar: guardarlo como copia.')) plans.splice(plans.indexOf(ex), 1);
+      else p.id = uid();
     }
-    main.append(
-      hero('Nuevo plan', '¿Cómo quieres empezar?', 'Después capturas los datos del paciente y llenas los 7 días con IA.'),
-      el('div', { class: 'tiles' }, [
-        tile('file', 'Plan en blanco', 'Empieza desde cero con los datos del paciente.', function () { make(null); }, true),
-        tile('spark', 'Plan de ejemplo', 'Con datos inventados, para practicar.', function () { make(samplePlan()); })
-      ])
-    );
-    if (templates.length) {
-      var box = el('section', { class: 'card stack', style: 'gap:8px' }, [el('div', { class: 'head-t', style: 'margin-bottom:8px' }, [el('h2', { text: 'Mis plantillas' }), el('p', { class: 'muted', style: 'font-size:15px', text: 'Planes guardados sin datos del paciente.' })])]);
-      templates.forEach(function (t, i) {
-        box.appendChild(el('div', { class: 'tpl' }, [el('strong', { text: t.tplName }),
-          el('button', { class: 'btn small primary', type: 'button', onclick: function () { make(t); }, text: 'Usar' }),
-          el('button', { class: 'btn small danger', type: 'button', 'aria-label': 'Borrar la plantilla ' + t.tplName, onclick: function () { if (confirm('¿Borrar la plantilla “' + t.tplName + '”?')) { templates.splice(i, 1); persist(); render(); } }, text: 'Borrar' })]));
-      });
-      main.appendChild(box);
-    }
-    var msg = el('p', { class: 'err', role: 'alert' });
-    /* Si el plan ya está en este dispositivo, se puede reemplazar con la versión del código. */
-    async function loadCode(text) {
-      msg.textContent = '';
-      try {
-        var p = await SarentiCodec.decode(text), ex = plans.filter(function (x) { return x.id === p.id; })[0];
-        if (ex) {
-          if (confirm('Ya tienes el plan de ' + (ex.name || 'este paciente') + '. ¿Reemplazarlo con el del código?\n\nAceptar: reemplazar. Cancelar: guardarlo como copia.')) plans.splice(plans.indexOf(ex), 1);
-          else p.id = uid();
-        }
-        addPlan(p, 2);
-      } catch (e) { msg.textContent = e.message; }
-    }
-    var ta = el('textarea', { id: 'code-in', class: 'paste', rows: '3', placeholder: 'SARENTI1.…' });
-    main.appendChild(el('section', { class: 'card stack' }, [
-      el('div', { class: 'head-t' }, [el('h2', { text: 'Abrir un plan que ya tiene QR' }), el('p', { class: 'muted', style: 'font-size:15px', text: 'Por ejemplo, uno hecho en otro dispositivo. Escanea el corazón o pega su código.' })]),
-      scanner(loadCode),
-      el('div', { class: 'fld' }, [el('label', { for: 'code-in', class: 'lbl', text: 'O pega el código: el mensaje de WhatsApp completo o solo lo que empieza con SARENTI' }), ta]),
-      el('div', { class: 'row' }, [el('button', { class: 'btn', type: 'button', onclick: function () { loadCode(ta.value); }, text: 'Cargar código' })]),
-      msg
-    ]));
+    addPlan(p, 2);
+  }
+  function templatesSection() {
+    if (!templates.length) return null;
+    var box = el('section', { class: 'card stack', style: 'gap:8px' }, [el('div', { class: 'head-t', style: 'margin-bottom:8px' }, [el('h2', { text: 'Mis plantillas', style: 'font-size:24px' }), el('p', { class: 'muted', style: 'font-size:15px', text: 'Planes guardados sin datos del paciente. “Usar” empieza un plan nuevo con sus comidas.' })])]);
+    templates.forEach(function (t, i) {
+      box.appendChild(el('div', { class: 'tpl' }, [el('strong', { text: t.tplName }),
+        el('button', { class: 'btn small primary', type: 'button', onclick: function () { newPlan(t); }, text: 'Usar' }),
+        el('button', { class: 'btn small danger', type: 'button', 'aria-label': 'Borrar la plantilla ' + t.tplName, onclick: function () { if (confirm('¿Borrar la plantilla “' + t.tplName + '”?')) { templates.splice(i, 1); persist(); render(); } }, text: 'Borrar' })]));
+    });
+    return box;
   }
 
-  /* ---------- escanear QR ---------- */
-  var scanStop = null;
-  function stopScan() { if (scanStop) { scanStop(); scanStop = null; } }
+  /* ---------- leer el corazón digital desde una imagen ---------- */
   /* crop = [x, y, lado] de la imagen original: solo se lee ese cuadro (sin reducirlo) para que el QR del corazón,
      que es denso (~110 cuadritos por lado), no pierda nitidez. */
   function readQR(src, w, h, cv, crop) {
@@ -378,47 +332,26 @@
     return r && r.data;
   }
   function fit(w, h, max) { var s = Math.min(1, max / Math.max(w, h)); return [Math.round(w * s), Math.round(h * s)]; }
-  function scanner(onCode) {
-    var box = el('div'), cv = document.createElement('canvas');
-    var msg = el('p', { class: 'hint', role: 'status' });
-    var video = el('video', { class: 'scan', playsinline: true, muted: true, 'aria-label': 'Vista de la cámara' });
-    var file = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: function (e) {
-      var f = e.target.files[0]; e.target.value = ''; if (!f) return;
-      var img = new Image();
-      img.onload = function () {
-        var d = fit(img.naturalWidth, img.naturalHeight, 1600), t = readQR(img, d[0], d[1], cv);
-        URL.revokeObjectURL(img.src);
-        if (t) { msg.textContent = ''; onCode(t); } else msg.textContent = 'No se encontró un QR en esa foto. Intenta con una más clara y de cerca.';
-      };
-      img.onerror = function () { msg.textContent = 'No se pudo abrir esa imagen.'; };
-      img.src = URL.createObjectURL(f);
-    } });
-    var cam = el('button', { class: 'btn primary', type: 'button', text: 'Abrir cámara', onclick: function () {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { msg.textContent = 'Este navegador no puede usar la cámara. Sube una foto del QR.'; return; }
-      /* Sin pedir resolución, Safari en iPhone da 640×480 y los cuadritos del QR quedan de ~1.5 px: no se lee. */
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (stream) {
-        stopScan();
-        var alive = true, timer = null, n = 0;
-        scanStop = function () { alive = false; clearTimeout(timer); stream.getTracks().forEach(function (t) { t.stop(); }); video.remove(); cam.hidden = false; stop.hidden = true; };
-        video.srcObject = stream; box.prepend(video); video.play().catch(function () {});
-        cam.hidden = true; stop.hidden = false; msg.textContent = 'Apunta la cámara al corazón y déjalo en el centro.';
-        (function tick() {
-          if (!alive) return;
-          if (video.readyState >= 2 && video.videoWidth) {
-            /* Se alterna: el cuadro del centro a resolución completa (hasta 1200 px) y la imagen entera reducida. */
-            var vw = video.videoWidth, vh = video.videoHeight, c = Math.min(vw, vh), e = Math.min(c, 1200), t;
-            if (n++ % 2 === 0) t = readQR(video, e, e, cv, [(vw - c) / 2, (vh - c) / 2, c]);
-            else { var d = fit(vw, vh, 1200); t = readQR(video, d[0], d[1], cv); }
-            if (t) { stopScan(); msg.textContent = ''; onCode(t); return; }
-          }
-          timer = setTimeout(tick, 150);
-        })();
-      }, function () { msg.textContent = 'No se pudo abrir la cámara. Revisa el permiso del navegador o sube una foto del QR.'; });
-    } });
-    var stop = el('button', { class: 'btn', type: 'button', hidden: true, text: 'Cerrar cámara', onclick: function () { stopScan(); msg.textContent = ''; } });
-    box.append(el('div', { class: 'row' }, [cam, stop, el('button', { class: 'btn', type: 'button', text: 'Subir foto del QR', onclick: function () { file.click(); } }), file]), msg);
-    return box;
+  /* Lee el QR de la imagen del corazón: ok(texto) o fail(mensaje). */
+  function readHeartFile(f, ok, fail) {
+    var img = new Image(), cv = document.createElement('canvas');
+    img.onload = function () {
+      var d = fit(img.naturalWidth, img.naturalHeight, 1600), t = readQR(img, d[0], d[1], cv);
+      URL.revokeObjectURL(img.src);
+      if (t) ok(t); else fail('No se encontró el corazón en esa imagen. Usa la imagen original del corazón digital.');
+    };
+    img.onerror = function () { fail('No se pudo abrir esa imagen.'); };
+    img.src = URL.createObjectURL(f);
   }
+  /* Desde Inicio: abre directo el selector de imagen; los errores salen como aviso. */
+  function pickHeart() {
+    var file = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: function (e) {
+      var f = e.target.files[0]; file.remove(); if (!f) return;
+      readHeartFile(f, function (t) { openHeartCode(t).catch(function (er) { toast(er.message); }); }, toast);
+    } });
+    document.body.appendChild(file); file.click();
+  }
+
 
   /* ---------- plan del paciente ---------- */
   var STEPS = ['Datos e IA', 'Comidas por día', 'Indicaciones', 'Lista de compras', 'Compartir'];
@@ -1202,6 +1135,68 @@
     if (!ready) main.appendChild(el('p', { class: 'hint noprint', style: 'text-align:right;margin-top:-12px', text: 'Compartir se activa cuando la IA ya revisó la lista de compras.' }));
   }
 
+  /* ---------- resumen del plan (para revisar y guardar en PDF) ---------- */
+  /* Tabla de Día 1 a Día 7: un renglón por comida (en orden de hora) y una columna por día. Se dice "Día 1"
+     y no "Lunes" porque la app de la paciente empieza a contar el día en que carga el plan. */
+  function planSummary(p) {
+    var days = p.days.map(function (d) { return d.slice().sort(byTime); });
+    var rows = Math.max.apply(null, days.map(function (d) { return d.length; }).concat([0]));
+    function cell(m) {
+      if (!m) return el('td', { class: 'none', text: '—' });
+      var first = (m.items[0] || '').trim(), kids = [];
+      if (isDish(first) && dishText(first).trim()) kids.push(el('strong', { text: dishText(first).trim() }));
+      var ings = m.items.map(function (t) { return t.trim(); }).filter(function (t) { return t && !isDish(t); });
+      if (ings.length) kids.push(el('ul', null, ings.map(function (t) { return el('li', { text: t }); })));
+      return el('td', null, kids.length ? kids : [el('span', { class: 'none', text: '—' })]);
+    }
+    var head = el('tr', null, [el('th', { scope: 'col', class: 'ml', text: 'Comida' })].concat(days.map(function (d, i) { return el('th', { scope: 'col', text: 'Día ' + (i + 1) }); })));
+    var body = [];
+    for (var r = 0; r < rows; r++) {
+      /* Nombre y hora del renglón: los del primer día que tenga esa comida. */
+      var ref = null; for (var d = 0; d < 7 && !ref; d++) ref = days[d][r] || null;
+      var t = fmtTime(ref.time);
+      body.push(el('tr', { class: isSnack(ref) ? 'snack' : '' }, [el('th', { scope: 'row', class: 'ml' }, [ref.name || 'Comida', ref.time ? el('small', { text: t.join(' ') }) : null])]
+        .concat(days.map(function (dd) {
+          var m = dd[r], c = cell(m);
+          if (m && norm(m.name || '') !== norm(ref.name || '')) c.prepend(el('em', { text: (m.name || 'Comida') + (m.time ? ' · ' + fmtTime(m.time).join(' ') : '') }));
+          return c;
+        }))));
+    }
+    function list(icn, title, items) {
+      return el('section', { class: 'ind' }, [el('h3', null, [icon(icn, 18), title]),
+        items.length ? el('ul', null, items.map(function (t) { return el('li', { text: t }); })) : el('p', { class: 'muted', text: 'Sin indicaciones' })]);
+    }
+    var l = p.glasses * 0.25;
+    function toPdf() {
+      var title = document.title;
+      document.title = 'Plan de alimentación - ' + (p.name || 'Paciente');   // nombre sugerido del archivo PDF
+      document.body.classList.add('print-plan');
+      window.addEventListener('afterprint', function done() {
+        document.body.classList.remove('print-plan'); document.title = title; window.removeEventListener('afterprint', done);
+      });
+      window.print();
+    }
+    var d0 = new Date();
+    return el('section', { class: 'card plansum', 'aria-labelledby': 'ps-h' }, [
+      el('div', { class: 'row noprint', style: 'justify-content:space-between;gap:12px;align-items:flex-start' }, [
+        el('div', { class: 'head-t' }, [el('h2', { id: 'ps-h', text: 'El plan completo' }),
+          el('p', { class: 'muted', style: 'font-size:15px', text: 'Revísalo antes de mandarlo. En la ventana de imprimir elige “Guardar como PDF”.' })]),
+        el('button', { class: 'btn primary', type: 'button', onclick: toPdf }, [icon('download'), 'Descargar PDF'])
+      ]),
+      el('header', { class: 'ps-top print-only' }, [
+        el('img', { src: 'img/logo.png', alt: 'Sarenti' }),
+        el('div', null, [el('h1', { text: 'Plan de alimentación' }), el('p', { text: (p.name || 'Paciente') + ' · ' + d0.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) })])
+      ]),
+      rows ? el('div', { class: 'ps-scroll' }, [el('table', { class: 'ps-tab' }, [el('thead', null, [head]), el('tbody', null, body)])])
+        : el('p', { class: 'muted', text: 'El plan todavía no tiene comidas.' }),
+      el('div', { class: 'inds' }, [
+        el('section', { class: 'ind' }, [el('h3', null, [icon('drop', 18), 'Agua']),
+          el('p', { text: p.glasses + ' vasos de 250 ml al día (' + l.toLocaleString('es-MX', { maximumFractionDigits: 2 }) + (l === 1 ? ' litro' : ' litros') + ')' })]),
+        list('cal', 'Cada día', p.daily), list('ban', 'Evitar', p.avoid), list('pot', 'Preparación', p.prep)
+      ])
+    ]);
+  }
+
   /* ---------- paso 5: compartir ---------- */
   var DEFAULT_MSG = 'Hola, te comparto tu plan de alimentación de Mi Plan Sarenti. Guarda esta imagen y en la app elige “Adjuntar corazón digital”.';
   function step5(main, p) {
@@ -1212,7 +1207,7 @@
     }
     var pc = main.querySelector('.pcard'); if (pc) pc.classList.add('noprint');
     var share = el('div', { class: 'share' }, [el('section', { class: 'card qrc' }, [el('p', { class: 'muted', text: 'Generando…' })])]);
-    main.append(share, bottomNav(p, 4, 0));
+    main.append(share, planSummary(p), bottomNav(p, 4, 0));
     var name = p.name || 'Paciente';
     var fontReady = document.fonts ? document.fonts.load('700 20px "Cormorant Garamond"').catch(function () {}) : null;
     /* Primero el código v1 (lo leen todas las versiones de la app); si no cabe en un QR, el v2, más compacto. */
@@ -1284,48 +1279,6 @@
       ]);
       share.replaceChildren(left, right);
     }, function () { share.replaceChildren(el('section', { class: 'card' }, [el('p', { class: 'err', role: 'alert', text: 'Este navegador no puede generar el código. Usa una versión reciente de Chrome, Edge, Safari o Firefox.' })])); });
-  }
-
-  /* ---------- respaldo ---------- */
-  function downloadBackup() {
-    var data = { app: 'planes-sarenti', v: 1, exported: nowSec(), plans: plans, templates: templates };
-    download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'sarenti-respaldo-' + new Date().toISOString().slice(0, 10) + '.json');
-    toast('Respaldo descargado');
-  }
-  function buildBackup(main) {
-    main.appendChild(hero('Respaldo', 'Respaldo y privacidad', 'Los planes viven solo en este dispositivo. Guarda una copia para no perderlos o para pasarlos a otro equipo.'));
-    main.appendChild(el('section', { class: 'card stack', style: 'gap:14px' }, [
-      el('h2', { text: 'Guardar un respaldo', style: 'font-size:24px' }),
-      el('p', { class: 'muted', style: 'font-size:15px', text: 'Descarga un archivo con todos tus planes y plantillas. Contiene datos de pacientes: guárdalo en un lugar seguro.' }),
-      el('div', null, [el('button', { class: 'btn primary', type: 'button', onclick: downloadBackup }, [icon('download'), 'Descargar respaldo'])])
-    ]));
-    var msg = el('p', { role: 'status' });
-    var file = el('input', { type: 'file', id: 'bk-file', accept: '.json,application/json', onchange: function (e) {
-      var f = e.target.files[0]; if (!f) return;
-      f.text().then(function (t) {
-        var d = JSON.parse(t); if (!d || d.app !== 'planes-sarenti' || !Array.isArray(d.plans)) throw 0;
-        var added = 0, updated = 0;
-        d.plans.forEach(function (np) {
-          var ex = plans.filter(function (x) { return x.id === np.id; })[0];
-          if (!ex) { plans.push(np); added++; } else if ((np.updated || 0) > (ex.updated || 0)) { plans[plans.indexOf(ex)] = np; updated++; }
-        });
-        (d.templates || []).forEach(function (t2) { if (!templates.some(function (x) { return x.tplName === t2.tplName; })) templates.push(t2); });
-        persist(); render(); toast('Listo: ' + added + ' planes nuevos y ' + updated + ' actualizados.');
-      }).catch(function () { msg.className = 'err'; msg.textContent = 'Ese archivo no es un respaldo de Planes Sarenti.'; });
-    } });
-    main.appendChild(el('section', { class: 'card stack', style: 'gap:14px' }, [
-      el('h2', { text: 'Cargar un respaldo', style: 'font-size:24px' }),
-      el('p', { class: 'muted', style: 'font-size:15px', text: 'Une los planes del archivo con los de este dispositivo. Si un plan está en los dos, se queda el más reciente.' }),
-      el('div', { class: 'fld' }, [el('label', { for: 'bk-file', class: 'lbl', text: 'Archivo de respaldo (.json)' }), file]), msg
-    ]));
-    main.appendChild(el('section', { class: 'card stack', style: 'gap:14px' }, [
-      el('h2', { text: 'PIN y privacidad', style: 'font-size:24px' }),
-      el('p', { class: 'muted', style: 'font-size:15px', text: 'El PIN evita que alguien abra la herramienta por casualidad. Los datos no están cifrados: protege también el dispositivo con su propio bloqueo de pantalla.' }),
-      el('div', { class: 'row' }, [
-        el('button', { class: 'btn', type: 'button', onclick: function () { var a = prompt('PIN actual:'); if (a === null) return; var d = lsGet(K_PIN); hashPin(a, d.salt).then(function (h) { if (h !== d.hash) return toast('PIN incorrecto'); lsDel(K_PIN); unlocked = false; render(); }); }, text: 'Cambiar PIN' }),
-        el('button', { class: 'btn danger', type: 'button', onclick: function () { if (confirm('Se borrarán TODOS los planes y plantillas de este dispositivo. ¿Seguro?') && confirm('Última confirmación: ¿ya descargaste un respaldo?')) { lsDel(K_PLANS); lsDel(K_TPL); plans = []; templates = []; go('home'); } }, text: 'Borrar todo' })
-      ])
-    ]));
   }
 
   /* ---------- inicio ---------- */
