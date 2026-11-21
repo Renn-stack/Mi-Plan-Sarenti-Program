@@ -872,8 +872,8 @@
       '- Las llaves son EXACTAMENTE los renglones de abajo, copiados igual (mismos acentos, mayúsculas y signos). Incluye todos.\n' +
       '- El valor es una lista con un ingrediente por elemento. Ej. "Limón y chile en polvo": ["Limón", "Chile en polvo"].\n' +
       '- Usa SIEMPRE el mismo nombre para el mismo ingrediente en todo el plan, sencillo y en singular: "Limón" (no "jugo de limón", "limones" ni "limón amarillo").\n' +
-      '- Cada ingrediente lleva UNA sola unidad en todo el plan, la que se usa para comprarlo en el súper: frutas, verduras y huevos en piezas ("2 jitomates", "1 limón"); lo demás en g o ml ("40 g de almendras", "150 g de pechuga", "250 ml de leche"). Usa solo piezas, g o ml.\n' +
-      '- Si un renglón trae el ingrediente en otra unidad, conviértelo a esa unidad de forma aproximada: "10 almendras": ["12 g de almendras"], "100 g de jitomate": ["1 jitomate"], "1 taza de leche": ["240 ml de leche"].\n' +
+      '- Cada ingrediente lleva UNA sola unidad en todo el plan, la que se usa para comprarlo en el súper: en piezas solo lo que se compra por pieza: huevo y frutas o verduras grandes o medianas ("2 jitomates", "1 limón", "1 manzana", "1 aguacate"); lo demás en g o ml, incluidas las frutas chicas que se compran por caja o a granel como fresas, uvas, arándanos, frambuesas, zarzamoras y cerezas, y las nueces y semillas ("40 g de almendras", "60 g de fresas", "150 g de pechuga", "250 ml de leche"). Usa solo piezas, g o ml.\n' +
+      '- Si un renglón trae el ingrediente en otra unidad, conviértelo a esa unidad de forma aproximada: "10 almendras": ["12 g de almendras"], "4 fresas": ["60 g de fresas"], "100 g de jitomate": ["1 jitomate"], "1 taza de leche": ["240 ml de leche"].\n' +
       '- Pon cantidad aproximada a TODO lo que se compra, aunque el renglón no la diga, pensando en una porción para esa comida: "Huevo cocido": ["1 huevo"], "Limón y hierbas": ["1 limón", "Hierbas finas"], "150 g de salmón con espárragos": ["150 g de salmón", "5 espárragos"].\n' +
       '- Sin cantidad SOLO los condimentos que no se compran por porción: sal, pimienta, especias, hierbas de olor, chile en polvo, vinagre, aceite en aerosol. Ej. "Pimienta", "Hierbas finas".\n' +
       '- Si el renglón ya es un solo ingrediente con cantidad en su unidad de compra, devuélvelo IGUAL, sin cambiarle nada: "2 huevos revueltos": ["2 huevos revueltos"].\n' +
@@ -1038,6 +1038,18 @@
     if (/^k/.test(u)) { v *= 1000; u = 'g'; } else if (/^g/.test(u)) u = 'g'; else if (/^m/.test(u)) u = 'ml'; else if (/^l/.test(u)) { v *= 1000; u = 'ml'; }
     return { qty: isFinite(v) ? v : null, unit: u, name: m[3].trim() };
   }
+  /* Piezas que dice el plan para un ingrediente que se compra en g o ml: renglón "10 almendras" e ingrediente
+     "12 g de almendras" → { n: 10, name: "almendras" }. Sirve para mostrar las dos cosas: cómo se compra y cómo se come. */
+  function piecesOf(line, r) {
+    if (!r.unit || r.qty === null) return null;
+    var key = nameKey(r.name), parts = String(line).split(/\s+(?:y|e|con)\s+|\s*[,;+]\s*/i);
+    for (var i = 0; i < parts.length; i++) {
+      var o = parseIng(parts[i]);
+      if (o.qty !== null && !o.unit && o.name && (nameKey(o.name) === key || nameKey(o.name).split(' ')[0] === key.split(' ')[0])) return { n: o.qty, name: o.name };
+    }
+    return null;
+  }
+  function pcsText(n, name) { return '≈ ' + fmtNum(Math.max(1, Math.round(n))) + ' ' + name.toLowerCase(); }
   function capFirst(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
   function fmtNum(v) {
     v = Math.round(v * 100) / 100;
@@ -1058,15 +1070,19 @@
       (s.hasOwnProperty(t) ? s[t] : [t]).forEach(function (ing) {
         var r = parseIng(ing); if (!r.name) return;
         var k = r.unit + '|' + nameKey(r.name), e = map[k];
-        if (!e) { e = map[k] = { key: k, name: capFirst(r.name), unit: r.unit, parts: [], cat: category(r.name) }; order.push(e); }
+        if (!e) { e = map[k] = { key: k, name: capFirst(r.name), unit: r.unit, parts: [], cat: category(r.name), pcs: 0, pcsQty: 0, pcsName: '' }; order.push(e); }
         if (r.name.length < e.name.length) e.name = capFirst(r.name);   // el nombre más corto suele ser el singular
         if (r.qty !== null) e.parts.push(r.qty);
+        var pc = piecesOf(t, r);
+        if (pc) { e.pcs += pc.n; e.pcsQty += r.qty; if (!e.pcsName || pc.n > 1) e.pcsName = pc.name; }
       });
     }); }); });
     order.forEach(function (e) {
       var sum = e.parts.reduce(function (a, b) { return a + b; }, 0);
       e.q = e.parts.length ? fmtQty(sum, e.unit) : '';
-      e.small = e.parts.length > 5 ? e.parts.length + ' porciones' : e.parts.length > 1 ? e.parts.map(fmtNum).join(' + ') + (e.unit ? ' ' + e.unit : '') : '';
+      /* Si el plan lo dice en piezas, se muestra cuántas son en total (proporción de las porciones que sí las traen). */
+      e.eq = e.pcs && e.pcsQty ? pcsText(sum * e.pcs / e.pcsQty, e.pcsName) : '';
+      e.small = e.eq || (e.parts.length > 5 ? e.parts.length + ' porciones' : e.parts.length > 1 ? e.parts.map(fmtNum).join(' + ') + (e.unit ? ' ' + e.unit : '') : '');
     });
     return order;
   }
@@ -1081,7 +1097,7 @@
     CAT_NAMES.forEach(function (c) {
       if (!g[c]) return;
       out.push('', c.toUpperCase());
-      g[c].forEach(function (e) { out.push('- ' + e.name + (e.q ? ': ' + e.q : '')); });
+      g[c].forEach(function (e) { out.push('- ' + e.name + (e.q ? ': ' + e.q : '') + (e.eq ? ' (' + e.eq + ')' : '')); });
     });
     return out.join('\n');
   }
@@ -1113,7 +1129,11 @@
     var s = p.shop || {}, map = {}, order = [], grid = el('div', { class: 'cats' });
     p.days.forEach(function (day, di) { day.forEach(function (m) {
       var first = (m.items[0] || '').trim(), title = isDish(first) && dishText(first).trim() ? dishText(first).trim() : m.name, ings = [];
-      m.items.forEach(function (t) { t = t.trim(); if (t && !isDish(t)) ings = ings.concat(s.hasOwnProperty(t) ? s[t] : [t]); });
+      /* En la receta va como se come, con los gramos al lado: "10 almendras (≈ 12 g)". */
+      m.items.forEach(function (t) { t = t.trim(); if (t && !isDish(t)) ings = ings.concat((s.hasOwnProperty(t) ? s[t] : [t]).map(function (ing) {
+        var r = parseIng(ing), pc = piecesOf(t, r);
+        return pc ? fmtNum(pc.n) + ' ' + pc.name + ' (≈ ' + fmtQty(r.qty, r.unit) + ')' : ing;
+      })); });
       if (!ings.length) return;
       var k = norm(title) + '|' + ings.map(norm).join('|'), e = map[k];
       if (!e) { e = map[k] = { title: title, meal: m.name, ings: ings, days: [] }; order.push(e); }
